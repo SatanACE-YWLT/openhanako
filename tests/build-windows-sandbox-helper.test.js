@@ -26,7 +26,7 @@ describe("Windows sandbox helper build script", () => {
     })).toBe(path.join("/repo", "dist-sandbox", "win-x64"));
   });
 
-  it("links the Win32 libraries required by restricted tokens and ACL APIs", () => {
+  it("links the Win32 libraries required by restricted tokens, ACL APIs, and private desktops", () => {
     const command = buildWindowsSandboxCompileCommand({
       source: "C:\\repo\\desktop\\native\\HanaWindowsSandboxHelper\\main.cpp",
       output: "C:\\repo\\dist-sandbox\\win-x64\\hana-win-sandbox.exe",
@@ -35,6 +35,7 @@ describe("Windows sandbox helper build script", () => {
     expect(command).toContain("cl.exe");
     expect(command).toContain("userenv.lib");
     expect(command).toContain("advapi32.lib");
+    expect(command).toContain("user32.lib");
   });
 
   it("uses restricted-token APIs instead of AppContainer launch APIs", () => {
