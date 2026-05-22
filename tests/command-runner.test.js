@@ -106,11 +106,50 @@ describe("createCommandRunner", () => {
       platform: "win32",
       profile: "pwsh",
       env: { PATH: "base" },
+      resolveWin32ShellRuntime: undefined,
+      getWin32ShellEnvForRuntime: undefined,
     });
     expect(spawnCommand).toHaveBeenCalledWith(expect.objectContaining({
       executable: "pwsh.exe",
       args: ["-Command", "Get-Location"],
       env: { PATH: "custom" },
+    }));
+  });
+
+  it("passes Windows runtime resolvers to the default profile resolver", async () => {
+    const spawnCommand = vi.fn(async () => ({ exitCode: 0 }));
+    const resolveWin32ShellRuntime = vi.fn(() => ({
+      shell: "C:\\Hanako\\resources\\git\\bin\\bash.exe",
+      args: ["-lc"],
+      label: "bundled",
+    }));
+    const getWin32ShellEnvForRuntime = vi.fn((env, shellInfo) => ({
+      ...env,
+      HANA_SHELL_LABEL: shellInfo.label,
+    }));
+    const run = createCommandRunner({
+      platform: "win32",
+      spawnCommand,
+      resolveWin32ShellRuntime,
+      getWin32ShellEnvForRuntime,
+    });
+
+    await run("pwd", "C:\\work", {
+      profile: "git-bash",
+      env: { PATH: "C:\\Windows\\System32" },
+    });
+
+    expect(resolveWin32ShellRuntime).toHaveBeenCalledWith({
+      preferBundled: true,
+      env: { PATH: "C:\\Windows\\System32" },
+    });
+    expect(spawnCommand).toHaveBeenCalledWith(expect.objectContaining({
+      executable: "C:\\Hanako\\resources\\git\\bin\\bash.exe",
+      args: ["-lc", "pwd"],
+      env: {
+        PATH: "C:\\Windows\\System32",
+        HANA_SHELL_LABEL: "bundled",
+      },
     }));
   });
 

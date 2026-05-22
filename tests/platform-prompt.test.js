@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getPlatformPromptNote } from "../core/platform-prompt.js";
+import { SANDBOX_MODE_LABEL } from "../lib/sandbox/policy.js";
 
 const baseOpts = { osType: "TestOS", osRelease: "1.2.3" };
 
@@ -16,7 +17,7 @@ describe("getPlatformPromptNote", () => {
     expect(out).toContain("<cwd>/workspace/project-hana</cwd>");
     expect(out).toContain("<shell>zsh</shell>");
     expect(out).toContain("<os>TestOS 1.2.3</os>");
-    expect(out).toContain("<sandbox_mode>read-all_write-scoped_network-on</sandbox_mode>");
+    expect(out).toContain(`<sandbox_mode>${SANDBOX_MODE_LABEL}</sandbox_mode>`);
     expect(out).toContain("Use structured file tools for source edits.");
     expect(out).toContain("</environment_context>");
   });
@@ -38,7 +39,7 @@ describe("getPlatformPromptNote", () => {
     expect(out).toContain("<platform>win32</platform>");
     expect(out).toContain("<cwd>C:\\work</cwd>");
     expect(out).toContain("<shell>powershell</shell>");
-    expect(out).toContain("<sandbox_mode>read-all_write-scoped_network-on</sandbox_mode>");
+    expect(out).toContain(`<sandbox_mode>${SANDBOX_MODE_LABEL}</sandbox_mode>`);
     expect(out).not.toContain("Shell: bash");
     expect(out).not.toContain("Prefer POSIX syntax");
     expect(out).not.toContain("platform-adaptive");
