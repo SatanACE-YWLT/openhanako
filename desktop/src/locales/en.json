@@ -2336,8 +2336,6 @@
   "preview.toggle": "Preview panel",
   "preview.markdownPreview": "Preview",
   "preview.exitMarkdownPreview": "Back to editing",
-  "preview.openInNewWindow": "Open in new window",
-  "preview.openInNewWindowUnsupported": "Not supported for this type",
   "preview.markdownEditorStatus": "Selected {selected} chars · Total {total} chars",
   "preview.markdownAttachmentInsertFailed": "Failed to insert attachment"
 }
