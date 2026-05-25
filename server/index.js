@@ -400,6 +400,11 @@ hub.eventBus.handle("deferred:register", ({ taskId, sessionPath, meta }) => {
   deferredResultStore.defer(taskId, sessionPath, meta);
   return { ok: true, sessionPath };
 });
+hub.eventBus.handle("deferred:retry", ({ taskId, sessionPath, meta }) => {
+  if (!sessionPath) return { ok: false, error: "sessionPath is required" };
+  deferredResultStore.retry(taskId, sessionPath, meta);
+  return { ok: true, sessionPath };
+});
 hub.eventBus.handle("deferred:resolve", ({ taskId, result, files, sessionFiles }) => {
   deferredResultStore.resolve(taskId, normalizeDeferredResolveResult({ result, files, sessionFiles }));
   return { ok: true };

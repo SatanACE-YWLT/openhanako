@@ -2,7 +2,7 @@
  * AssistantMessage — 助手消息，遍历 ContentBlock 按类型渲染
  */
 
-import { Component, memo, useCallback, useMemo, useState, type ErrorInfo, type ReactNode } from 'react';
+import { Component, memo, useCallback, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from 'react';
 import { StreamingMarkdownContent } from './StreamingMarkdownContent';
 import { MoodBlock } from './MoodBlock';
 import { ThinkingBlock } from './ThinkingBlock';
@@ -167,6 +167,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               messageId={message.id}
               blockIdx={i}
               isStreaming={isStreaming}
+              readOnly={readOnly}
             />
           </ContentBlockErrorBoundary>
         ))}
@@ -243,7 +244,7 @@ class ContentBlockErrorBoundary extends Component<{
 
 // ── ContentBlock 分发 ──
 
-const ContentBlockView = memo(function ContentBlockView({ block, agentName, agentId, yuan: _yuan, sessionPath, messageId, blockIdx, isStreaming }: {
+const ContentBlockView = memo(function ContentBlockView({ block, agentName, agentId, yuan: _yuan, sessionPath, messageId, blockIdx, isStreaming, readOnly }: {
   block: ContentBlock;
   agentName: string;
   agentId?: string | null;
@@ -252,6 +253,7 @@ const ContentBlockView = memo(function ContentBlockView({ block, agentName, agen
   messageId: string;
   blockIdx: number;
   isStreaming: boolean;
+  readOnly: boolean;
 }) {
   switch (block.type) {
     case 'thinking':
@@ -281,7 +283,7 @@ const ContentBlockView = memo(function ContentBlockView({ block, agentName, agen
         />
       );
     case 'media_generation':
-      return <MediaGenerationBlock block={block} />;
+      return <MediaGenerationBlock block={block} sessionPath={sessionPath} readOnly={readOnly} />;
     default: {
       const Renderer = BLOCK_RENDERERS[block.type];
       return Renderer ? <Renderer block={block} agentId={agentId} /> : null;
@@ -302,14 +304,49 @@ const EXT_LABELS: Record<string, string> = {
   png: 'Image', jpg: 'Image', jpeg: 'Image', gif: 'Image', webp: 'Image',
 };
 
-const MediaGenerationBlock = memo(function MediaGenerationBlock({ block }: { block: any }) {
-  const failed = block.status === 'failed' || block.status === 'aborted';
-  const kindLabel = block.kind === 'video' ? '视频' : '图片';
+const MediaGenerationBlock = memo(function MediaGenerationBlock({ block, sessionPath, readOnly }: { block: any; sessionPath: string; readOnly: boolean }) {
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState('');
+  const [localBlock, setLocalBlock] = useState<any | null>(null);
+  const viewBlock = localBlock?.taskId === block.taskId ? { ...block, ...localBlock } : block;
+  const failed = viewBlock.status === 'failed' || viewBlock.status === 'aborted';
+  const kindLabel = viewBlock.kind === 'video' ? '视频' : '图片';
+  const canRetry = failed && viewBlock.kind !== 'video' && !readOnly && typeof viewBlock.taskId === 'string';
   const titleText = failed
     ? `${kindLabel}生成失败`
     : `${kindLabel}生成中`;
-  const reason = typeof block.reason === 'string' ? block.reason : '';
-  const prompt = typeof block.prompt === 'string' ? block.prompt : '';
+  const reason = retryError || (typeof viewBlock.reason === 'string' ? viewBlock.reason : '');
+  const prompt = typeof viewBlock.prompt === 'string' ? viewBlock.prompt : '';
+
+  useEffect(() => {
+    setLocalBlock(null);
+    setRetrying(false);
+    setRetryError('');
+  }, [block]);
+
+  const handleRetry = useCallback(async () => {
+    if (!canRetry || retrying) return;
+    setRetrying(true);
+    setRetryError('');
+    try {
+      const res = await hanaFetch(`/api/plugins/image-gen/tasks/${encodeURIComponent(viewBlock.taskId)}/retry`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => null);
+      const placeholder = data?.placeholder || {
+        type: 'media_generation',
+        taskId: viewBlock.taskId,
+        kind: 'image',
+        status: 'pending',
+        ...(prompt ? { prompt } : {}),
+      };
+      setLocalBlock(placeholder);
+      useStore.getState().resolveBlockByTaskId(sessionPath, viewBlock.taskId, placeholder);
+    } catch (err) {
+      setRetryError(err instanceof Error ? err.message : '重新生成失败');
+      setRetrying(false);
+    }
+  }, [canRetry, prompt, retrying, sessionPath, viewBlock.taskId]);
 
   return (
     <div className={`${styles.mediaGenerationCard}${failed ? ` ${styles.mediaGenerationCardFailed}` : ''}`}>
@@ -321,6 +358,17 @@ const MediaGenerationBlock = memo(function MediaGenerationBlock({ block }: { blo
           </div>
           {(failed ? reason : prompt) && (
             <div className={styles.mediaGenerationPrompt}>{failed ? reason : prompt}</div>
+          )}
+          {canRetry && (
+            <button
+              type="button"
+              className={styles.mediaGenerationRetryButton}
+              onClick={handleRetry}
+              disabled={retrying}
+              aria-label={`重新生成${kindLabel}`}
+            >
+              {retrying ? '提交中' : '重新生成'}
+            </button>
           )}
         </div>
       </div>

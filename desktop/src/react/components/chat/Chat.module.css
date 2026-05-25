@@ -1143,6 +1143,33 @@
     text-overflow: ellipsis;
 }
 
+.mediaGenerationRetryButton {
+    margin-top: var(--space-sm);
+    padding: 0.28rem 0.55rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-card, var(--bg)) 80%, var(--text) 8%);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    cursor: default;
+    transition:
+        background var(--duration-instant) var(--ease-out),
+        border-color var(--duration-instant) var(--ease-out);
+}
+
+.mediaGenerationRetryButton:hover:not(:disabled),
+.mediaGenerationRetryButton:focus-visible {
+    background: var(--overlay-subtle);
+    outline: none;
+}
+
+.mediaGenerationRetryButton:disabled {
+    color: var(--text-muted);
+    cursor: default;
+}
+
 /* ── 图片输出卡片 ── */
 
 .imageOutputCard {

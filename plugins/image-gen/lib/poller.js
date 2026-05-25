@@ -73,6 +73,8 @@ export class Poller {
    * @param {string} taskId
    */
   add(taskId) {
+    this._cancelled.delete(taskId);
+    this._errorCounts.delete(taskId);
     this._active.add(taskId);
   }
 
