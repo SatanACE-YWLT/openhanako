@@ -1,14 +1,21 @@
 import { COVER_GALLERY_PRESETS, type CoverGalleryPreset } from '../../../../../shared/cover-gallery-presets.js';
 import bambooShadowMinimal from '../../../assets/cover-gallery/bamboo-shadow-minimal.jpg';
+import blueSkyScreenprint from '../../../assets/cover-gallery/blue-sky-screenprint.jpg';
 import blueIslandWatercolor from '../../../assets/cover-gallery/blue-island-watercolor.jpg';
+import feltBlueStorybook from '../../../assets/cover-gallery/felt-blue-storybook.jpg';
 import fourSeasonsStorybook from '../../../assets/cover-gallery/four-seasons-storybook.jpg';
 import grassHorizonDream from '../../../assets/cover-gallery/grass-horizon-dream.jpg';
 import greenPlainClouds from '../../../assets/cover-gallery/green-plain-clouds.jpg';
 import hiddenRagdollCat from '../../../assets/cover-gallery/hidden-ragdoll-cat.jpg';
+import indigoWindowSilhouette from '../../../assets/cover-gallery/indigo-window-silhouette.jpg';
+import maximalistFourSeasons from '../../../assets/cover-gallery/maximalist-four-seasons.jpg';
 import naturePlatePrint from '../../../assets/cover-gallery/nature-plate-print.jpg';
 import pastelSpringBookmark from '../../../assets/cover-gallery/pastel-spring-bookmark.jpg';
+import pinkDaisyFireworks from '../../../assets/cover-gallery/pink-daisy-fireworks.jpg';
 import pinkFlowerFisherman from '../../../assets/cover-gallery/pink-flower-fisherman.jpg';
 import scribbleBlackCat from '../../../assets/cover-gallery/scribble-black-cat.jpg';
+import springGauzeRoom from '../../../assets/cover-gallery/spring-gauze-room.jpg';
+import storyGardenObjects from '../../../assets/cover-gallery/story-garden-objects.jpg';
 import summerSeaFantasy from '../../../assets/cover-gallery/summer-sea-fantasy.jpg';
 import sunlitWindowLeaves from '../../../assets/cover-gallery/sunlit-window-leaves.jpg';
 
@@ -18,15 +25,22 @@ export interface CoverGalleryItem extends CoverGalleryPreset {
 
 const COVER_GALLERY_IMAGE_URLS: Record<string, string> = {
   'bamboo-shadow-minimal': bambooShadowMinimal,
+  'blue-sky-screenprint': blueSkyScreenprint,
   'blue-island-watercolor': blueIslandWatercolor,
+  'felt-blue-storybook': feltBlueStorybook,
   'four-seasons-storybook': fourSeasonsStorybook,
   'grass-horizon-dream': grassHorizonDream,
   'green-plain-clouds': greenPlainClouds,
   'hidden-ragdoll-cat': hiddenRagdollCat,
+  'indigo-window-silhouette': indigoWindowSilhouette,
+  'maximalist-four-seasons': maximalistFourSeasons,
   'nature-plate-print': naturePlatePrint,
   'pastel-spring-bookmark': pastelSpringBookmark,
+  'pink-daisy-fireworks': pinkDaisyFireworks,
   'pink-flower-fisherman': pinkFlowerFisherman,
   'scribble-black-cat': scribbleBlackCat,
+  'spring-gauze-room': springGauzeRoom,
+  'story-garden-objects': storyGardenObjects,
   'summer-sea-fantasy': summerSeaFantasy,
   'sunlit-window-leaves': sunlitWindowLeaves,
 } satisfies Record<string, string>;

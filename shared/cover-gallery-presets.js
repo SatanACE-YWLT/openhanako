@@ -71,6 +71,48 @@ export const COVER_GALLERY_PRESETS = Object.freeze([
     fileName: "summer-sea-fantasy.jpg",
     category: "default",
   },
+  {
+    id: "pink-daisy-fireworks",
+    title: "粉菊烟火",
+    fileName: "pink-daisy-fireworks.jpg",
+    category: "default",
+  },
+  {
+    id: "maximalist-four-seasons",
+    title: "繁花四季",
+    fileName: "maximalist-four-seasons.jpg",
+    category: "default",
+  },
+  {
+    id: "story-garden-objects",
+    title: "园中物语",
+    fileName: "story-garden-objects.jpg",
+    category: "default",
+  },
+  {
+    id: "blue-sky-screenprint",
+    title: "蓝天版画",
+    fileName: "blue-sky-screenprint.jpg",
+    category: "default",
+  },
+  {
+    id: "indigo-window-silhouette",
+    title: "靛窗花影",
+    fileName: "indigo-window-silhouette.jpg",
+    category: "default",
+  },
+  {
+    id: "spring-gauze-room",
+    title: "春纱小室",
+    fileName: "spring-gauze-room.jpg",
+    category: "default",
+  },
+  {
+    id: "felt-blue-storybook",
+    title: "蓝毡绘本",
+    fileName: "felt-blue-storybook.jpg",
+    category: "default",
+  },
 ].map(Object.freeze));
 
 const COVER_GALLERY_PRESET_BY_ID = new Map(COVER_GALLERY_PRESETS.map((preset) => [preset.id, preset]));
