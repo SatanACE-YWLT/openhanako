@@ -1708,6 +1708,10 @@
     "subagent": {
       "title": "子助手"
     },
+    "workflow": {
+      "title": "Workflow",
+      "running": "已運行 {text}"
+    },
     "session": {
       "title": "本次對話",
       "cwd": "工作目錄",

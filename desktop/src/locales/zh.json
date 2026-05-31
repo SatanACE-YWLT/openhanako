@@ -1716,6 +1716,10 @@
     "subagent": {
       "title": "子助手"
     },
+    "workflow": {
+      "title": "Workflow",
+      "running": "已运行 {text}"
+    },
     "session": {
       "title": "本次对话",
       "cwd": "工作目录",

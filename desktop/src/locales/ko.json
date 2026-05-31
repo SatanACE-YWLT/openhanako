@@ -1716,6 +1716,10 @@
     "subagent": {
       "title": "서브 에이전트"
     },
+    "workflow": {
+      "title": "Workflow",
+      "running": "실행 중 {text}"
+    },
     "session": {
       "title": "이 대화",
       "cwd": "작업 폴더",

@@ -38,4 +38,18 @@ describe('WorkflowCard', () => {
     expect(container.textContent).toContain('跑着的');
     expect(container.textContent).not.toContain('sub-only');
   });
+
+  it('标题走 i18n、done 显示耗时', () => {
+    (window as any).t = (k: string, vars?: any) =>
+      k === 'rightWorkspace.workflow.title' ? '工作流卡'
+      : k === 'activity.duration' ? `耗时 ${vars?.text}`
+      : k;
+    mockState.agentActivitiesBySession = {
+      '/s/a.jsonl': [mk({ id: 'w1', kind: 'workflow', status: 'done', summary: 'X', startedAt: 1000, finishedAt: 6000 })],
+    };
+    const { container } = render(<WorkflowCard />);
+    expect(container.textContent).toContain('工作流卡'); // 标题走 i18n
+    expect(container.textContent).toContain('5s'); // 6000-1000=5s 耗时
+    delete (window as any).t;
+  });
 });

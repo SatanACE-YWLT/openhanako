@@ -1716,6 +1716,10 @@
     "subagent": {
       "title": "サブエージェント"
     },
+    "workflow": {
+      "title": "Workflow",
+      "running": "実行中 {text}"
+    },
     "session": {
       "title": "この対話",
       "cwd": "作業フォルダ",

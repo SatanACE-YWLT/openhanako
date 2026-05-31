@@ -37,7 +37,7 @@
 
 .row {
     display: grid;
-    grid-template-columns: 16px minmax(0, 1fr);
+    grid-template-columns: 16px minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
     padding: 3px 2px;
@@ -79,4 +79,11 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.duration {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }

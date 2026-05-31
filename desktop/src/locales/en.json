@@ -1716,6 +1716,10 @@
     "subagent": {
       "title": "Sub-agents"
     },
+    "workflow": {
+      "title": "Workflow",
+      "running": "Running {text}"
+    },
     "session": {
       "title": "This Conversation",
       "cwd": "Workspace",
