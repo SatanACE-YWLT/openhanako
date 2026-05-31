@@ -41,10 +41,25 @@ const SIDE_EFFECT_TOOLS = new Set([
   "unpin_memory",
 ]);
 
-// subagent 上下文固定边界（与 permission mode 无关）：防自递归。收口在拦截层而非剥离——
-// subagent 工具对模型仍可见，调用时被拦（Codex 式甲）。未来要加更多 subagent 禁用工具加到这里。
+// subagent 上下文固定边界（与 permission mode 无关）：哪怕 operate 也拦。收口在拦截层而非剥离——
+// subagent 工具对模型仍可见，调用时被拦（Codex 式甲），保证缓存前缀统一。未来加禁用工具加到这里。
+// 范畴：① 防自递归与间接扇出；② 长期记忆（subagent 不碰）；③ agent 一生/对外副作用。
+// 不含 computer（有独立全局开关兜底）、search_memory/recall_experience（只读记忆，允许查）。
 const SUBAGENT_BLOCKED_TOOLS = new Set([
-  "subagent",
+  // ① 扇出
+  "subagent",          // 防自递归
+  "workflow",          // 间接扇出
+  // ② 长期记忆（与「subagent 不带长期记忆」原则一致：可读不可写）
+  "pin_memory",
+  "unpin_memory",
+  "record_experience",
+  // ③ agent 生命周期 / 对外副作用
+  "cron",
+  "channel",
+  "dm",
+  "notify",
+  "install_skill",
+  "update_settings",
 ]);
 
 const BROWSER_READ_ACTIONS = new Set([

@@ -487,6 +487,9 @@ export class Agent {
       setSubagentController: (id, ctrl) => this._cb?.setSubagentController?.(id, ctrl),
       removeSubagentController: (id) => this._cb?.removeSubagentController?.(id),
       getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
+      // 父会话当前权限档：subagent 省略 access 参数时据此继承（Codex 式）。
+      // 按显式 sessionPath 反查，不从焦点指针推导（状态归属唯一确定）。
+      getSessionPermissionMode: (sp) => this._cb?.getSessionPermissionMode?.(sp) ?? null,
       // Subagent 继承 parent session 的 cwd（不是 agent 的 home_folder）：
       // 用户在主 session 里可能把 cwd 切到某个子项目，派出 subagent 时应当在同一处干活。
       getParentCwd: () => this._cb?.getCwd?.() || null,

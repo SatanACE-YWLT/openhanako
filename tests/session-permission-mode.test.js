@@ -63,4 +63,28 @@ describe("session permission modes", () => {
     expect(classifySessionPermission({ mode: "read_only", toolName: "write", context: { isSubagent: true } }))
       .toMatchObject({ action: "deny", code: "ACTION_BLOCKED_BY_READ_ONLY" });
   });
+
+  it("blocks the full subagent越权 tool set inside a subagent (memory/lifecycle/fan-out), independent of mode", () => {
+    // subagent 不该碰：污染长期记忆 / 管 agent 一生 / 再扇出。即便最宽松的 operate 也拦。
+    const BLOCKED = [
+      "subagent",         // 防自递归
+      "pin_memory", "unpin_memory", "record_experience", // 长期记忆（subagent 不碰）
+      "cron", "channel", "dm", "notify", "install_skill", "update_settings", // agent 生命周期/对外
+      "workflow",         // 间接扇出
+    ];
+    for (const name of BLOCKED) {
+      expect(
+        classifySessionPermission({ mode: "operate", toolName: name, context: { isSubagent: true } }),
+        `${name} 应在 subagent 上下文被拦`,
+      ).toMatchObject({ action: "deny", code: "ACTION_BLOCKED_IN_SUBAGENT" });
+      // 非 subagent 上下文：operate 正常放行（限制仅在 subagent 上下文）
+      expect(
+        classifySessionPermission({ mode: "operate", toolName: name }),
+        `${name} 在普通上下文 operate 应放行`,
+      ).toEqual({ action: "allow" });
+    }
+    // computer 不在禁用集（有全局开关兜底）：subagent 上下文 operate 仍放行
+    expect(classifySessionPermission({ mode: "operate", toolName: "computer", context: { isSubagent: true } }))
+      .toEqual({ action: "allow" });
+  });
 });

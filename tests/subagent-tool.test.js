@@ -106,7 +106,7 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     const opts = capture.mock.calls[0][1];
     expect(opts.toolFilter).toBeUndefined();      // 甲：不剥离自定义工具，给全集
     expect(opts.builtinFilter).toBeUndefined();   // 甲：不剥离内置工具，给全集
-    expect(opts.permissionMode).toBe("operate");  // 执行档（探索者只读档待后缀角色规则）
+    expect(opts.permissionMode).toBe("operate");  // 无 access + 无父档 → operate（历史默认全权）
     expect(opts.subagentContext).toBe(true);      // → classify 防自递归
   });
 
@@ -475,8 +475,8 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     );
   });
 
-  // 6. per-session concurrent limit: rejects 9th task on the same session
-  it("rejects new work when the per-session limit (8) is reached", async () => {
+  // 6. per-session concurrent limit: rejects 11th task on the same session
+  it("rejects new work when the per-session limit (10) is reached", async () => {
     const pending = [];
     const blockingExecute = vi.fn().mockImplementation((_prompt, opts) => {
       opts?.onSessionReady?.("/test/child.jsonl");
@@ -487,18 +487,18 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
       getDeferredStore: () => mockStore,
     }));
 
-    // Dispatch 8 tasks on the same session (fire-and-forget)
+    // Dispatch 10 tasks on the same session (fire-and-forget)
     const results = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       results.push(await tool.execute(`call_${i}`, { task: `任务 ${i}` }, null, null, mockCtx()));
     }
     for (const r of results) {
       expect(r.details.streamStatus).toBe("running");
     }
 
-    // 9th task on the same session must be rejected
-    const blocked = await tool.execute("call_8", { task: "第九个任务" }, null, null, mockCtx());
-    expect(blocked.content[0].text).toMatch(/8|subagentMaxConcurrent/);
+    // 11th task on the same session must be rejected
+    const blocked = await tool.execute("call_10", { task: "第十一个任务" }, null, null, mockCtx());
+    expect(blocked.content[0].text).toMatch(/10|subagentMaxConcurrent/);
     expect(blocked.details).toBeUndefined();
 
     // Cleanup
@@ -519,26 +519,26 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
       getDeferredStore: () => mockStore,
     }));
 
-    // Session A: dispatch 8 tasks
-    for (let i = 0; i < 8; i++) {
+    // Session A: dispatch 10 tasks
+    for (let i = 0; i < 10; i++) {
       const r = await tool.execute(`call_a${i}`, { task: `任务 A${i}` }, null, null, mockCtx("/session/a.jsonl"));
       expect(r.details.streamStatus).toBe("running");
     }
 
-    // Session B: should still be able to dispatch 8 tasks (independent quota)
-    for (let i = 0; i < 8; i++) {
+    // Session B: should still be able to dispatch 10 tasks (independent quota)
+    for (let i = 0; i < 10; i++) {
       const r = await tool.execute(`call_b${i}`, { task: `任务 B${i}` }, null, null, mockCtx("/session/b.jsonl"));
       expect(r.details.streamStatus).toBe("running");
     }
 
-    // Session A: 9th task should be rejected
-    const blockedA = await tool.execute("call_a8", { task: "第九个 A" }, null, null, mockCtx("/session/a.jsonl"));
-    expect(blockedA.content[0].text).toMatch(/8|subagentMaxConcurrent/);
+    // Session A: 11th task should be rejected
+    const blockedA = await tool.execute("call_a10", { task: "第十一个 A" }, null, null, mockCtx("/session/a.jsonl"));
+    expect(blockedA.content[0].text).toMatch(/10|subagentMaxConcurrent/);
     expect(blockedA.details).toBeUndefined();
 
-    // Session B: 9th task should also be rejected
-    const blockedB = await tool.execute("call_b8", { task: "第九个 B" }, null, null, mockCtx("/session/b.jsonl"));
-    expect(blockedB.content[0].text).toMatch(/8|subagentMaxConcurrent/);
+    // Session B: 11th task should also be rejected
+    const blockedB = await tool.execute("call_b10", { task: "第十一个 B" }, null, null, mockCtx("/session/b.jsonl"));
+    expect(blockedB.content[0].text).toMatch(/10|subagentMaxConcurrent/);
     expect(blockedB.details).toBeUndefined();
 
     // Cleanup
@@ -681,6 +681,83 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     // sync fallback returns the reply text directly (no details / streamStatus)
     expect(result.content[0].text).toBe("sync result");
     expect(result.details).toBeUndefined();
+  });
+});
+
+describe("subagent-tool 权限档（Codex 式：access 参数 + 继承父会话）", () => {
+  let mockStore;
+  beforeEach(() => {
+    mockStore = { defer: vi.fn(), resolve: vi.fn(), fail: vi.fn(), query: vi.fn(() => ({ meta: {} })), _save: vi.fn() };
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  async function captureOpts(params, extraDeps = {}) {
+    const capture = makeExecuteIsolated();
+    const tool = createSubagentTool(makeDeps({
+      executeIsolated: capture,
+      getDeferredStore: () => mockStore,
+      ...extraDeps,
+    }));
+    await tool.execute("call_1", params, null, null, mockCtx());
+    await vi.waitFor(() => expect(capture).toHaveBeenCalledTimes(1));
+    return capture.mock.calls[0][1];
+  }
+
+  it("access:read → 派单 permissionMode=read_only（探索者只读，真实 write 由拦截层挡）", async () => {
+    const opts = await captureOpts({ task: "调研", access: "read" });
+    expect(opts.permissionMode).toBe("read_only");
+    expect(opts.subagentContext).toBe(true);
+  });
+
+  it("access:write → 派单 permissionMode=operate（执行者可操作）", async () => {
+    const opts = await captureOpts({ task: "改代码", access: "write" });
+    expect(opts.permissionMode).toBe("operate");
+  });
+
+  it("access:read 压过父会话可操作档（显式优先）", async () => {
+    const opts = await captureOpts(
+      { task: "只读审查", access: "read" },
+      { getSessionPermissionMode: () => "operate" },
+    );
+    expect(opts.permissionMode).toBe("read_only");
+  });
+
+  it("省略 access + 父会话只读(plan) → 继承 read_only", async () => {
+    const opts = await captureOpts(
+      { task: "跟随父档" },
+      { getSessionPermissionMode: () => "read_only" },
+    );
+    expect(opts.permissionMode).toBe("read_only");
+  });
+
+  it("省略 access + 父会话可操作 → 继承 operate", async () => {
+    const opts = await captureOpts(
+      { task: "跟随父档" },
+      { getSessionPermissionMode: () => "operate" },
+    );
+    expect(opts.permissionMode).toBe("operate");
+  });
+
+  it("省略 access + 父会话先问(ask) → operate（后台不能交互确认，绝不挂在确认上）", async () => {
+    const opts = await captureOpts(
+      { task: "跟随父档" },
+      { getSessionPermissionMode: () => "ask" },
+    );
+    expect(opts.permissionMode).toBe("operate");
+  });
+
+  it("非法 access 值按省略处理（继承父只读档）", async () => {
+    const opts = await captureOpts(
+      { task: "x", access: "garbage" },
+      { getSessionPermissionMode: () => "read_only" },
+    );
+    expect(opts.permissionMode).toBe("read_only");
+  });
+
+  it("getSessionPermissionMode 按 parentSessionPath 反查（不从焦点推导）", async () => {
+    const getSessionPermissionMode = vi.fn(() => "read_only");
+    await captureOpts({ task: "x" }, { getSessionPermissionMode });
+    expect(getSessionPermissionMode).toHaveBeenCalledWith("/test/session.jsonl");
   });
 });
 

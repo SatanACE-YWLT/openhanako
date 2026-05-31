@@ -836,6 +836,7 @@ export class AgentManager {
       emitDevLog:           (text, level) => getEngine()?.emitDevLog?.(text, level),
       getConfirmStore:      () => getEngine()?.confirmStore ?? null,
       getCurrentSessionPath:() => getEngine()?.currentSessionPath ?? null,
+      getSessionPermissionMode: (sp) => getEngine()?.getSessionPermissionMode?.(sp) ?? null,
       getSessionCwd:        (sp) => getEngine()?.getSessionByPath?.(sp)?.sessionManager?.getCwd?.() ?? null,
       getSessionWorkspaceFolders: (sp) => getEngine()?.getSessionWorkspaceFolders?.(sp) ?? [],
       getHomeCwd:           (agentId) => getEngine()?.getHomeCwd?.(agentId) ?? null,
