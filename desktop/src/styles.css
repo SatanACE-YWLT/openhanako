@@ -233,6 +233,9 @@ option,
    标题栏拖拽区
    ======================================== */
 .titlebar {
+    /* relative 接替原 position:fixed 的定位上下文职责：window-controls（Win 三大金刚）、
+       频道标签 .tbTabs、widget dropdown 均 absolute 依赖 titlebar 定位；删则逃逸撑满整个视口 */
+    position: relative;
     flex-shrink: 0;
     height: var(--titlebar-h);
     -webkit-app-region: drag;
