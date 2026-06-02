@@ -2294,7 +2294,6 @@
     },
     "todoWrite": {
       "label": "TODO",
-      "description": "現在のセッションの TODO リストを管理します。呼び出すたびに完全な todos 配列を渡して現在の状態を置き換えます（置換スタイル）。\n各 TODO に必要：\n- content: 静的な説明（例：『仕様を読む』）\n- activeForm: 実行中の説明（例：『仕様を読んでいます』）\n- status: pending | in_progress | completed\n慣例：同時に実行中は最大 1 つまで。",
       "contentDesc": "TODO の静的な説明",
       "activeFormDesc": "実行中の形式の説明（UI で in_progress 表示時に使用）",
       "statusDesc": "pending / in_progress / completed のいずれか",
@@ -2315,7 +2314,6 @@
       "recallDescription": "経験ライブラリを閲覧します。パラメータなしで全カテゴリの概要を返し、カテゴリ名を指定するとそのカテゴリの具体的な経験を返します。ユーザーから具体的な作業（コード作成、調査、ドキュメント作成、問題分析など）を依頼された場合、開始前にこのツールで参考になる経験がないか確認します。雑談、Q&A、日常会話では呼び出す必要はありません。",
       "recallCategoryDesc": "カテゴリ名。省略すると全カテゴリの概要を返します",
       "recordLabel": "経験を記録",
-      "recordDescription": "経験ライブラリに教訓を記録します。以下の場合に使用：ユーザーが間違いを指摘して正しい方法を説明した、複数の方法を試して効果的な方法を発見した、ユーザーが明確に「今後はこうして/こうしないで」と言った場合。各エントリは簡潔かつ直接的に、一文で記述します。",
       "recordCategoryDesc": "経験のカテゴリ、2〜4 語の短いフレーズ、例：「ツール使用」「検索テクニック」「回答スタイル」",
       "recordContentDesc": "具体的な経験内容、簡潔かつ直接的に、一文で"
     },
@@ -2350,7 +2348,6 @@
     },
     "updateSettings": {
       "label": "設定",
-      "description": "HanaAgent の設定を変更します。2つの操作があります：\n- search + query：キーワードで設定項目を検索し、現在の値と選択肢を確認\n- apply + key + value：指定した設定を変更（ユーザー確認が必要）\n\n正確なキーが分かっている場合は、検索をスキップして直接 apply できます。",
       "actionDesc": "操作タイプ：search で設定を検索 / apply で設定を変更",
       "queryDesc": "検索キーワード（search 時に必須）",
       "keyDesc": "設定キー（search で取得）",

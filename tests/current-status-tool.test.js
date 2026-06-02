@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { classifySessionPermission } from "../core/session-permission-mode.js";
 import { createCurrentStatusTool } from "../lib/tools/current-status-tool.js";
+import { loadLocale } from "../server/i18n.js";
 
 function textPayload(result) {
   return JSON.parse(result.content[0].text);
@@ -41,12 +42,25 @@ describe("current_status tool", () => {
   });
 
   it("describes time and logical_date as distinct lookup contracts", () => {
+    loadLocale("en");
     const tool = createCurrentStatusTool();
 
     expect(tool.description).toContain('key="time"');
     expect(tool.description).toContain("hour/minute");
     expect(tool.description).toContain('key="logical_date"');
     expect(tool.description).toContain("does not return hour/minute/second");
+  });
+
+  it("localizes the description and current-view guidance via i18n", () => {
+    loadLocale("zh");
+    const zhTool = createCurrentStatusTool();
+    expect(zhTool.description).toContain("当前视野");
+    expect(zhTool.description).toContain("ui_context");
+
+    loadLocale("en");
+    const enTool = createCurrentStatusTool();
+    expect(enTool.description).toContain("UI context");
+    expect(enTool.description).toContain("ui_context");
   });
 
   it("lists available status keys without returning live status values", async () => {

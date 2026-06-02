@@ -2294,13 +2294,19 @@
     },
     "todoWrite": {
       "label": "待办",
-      "description": "管理当前 session 内的待办清单。每次调用传入完整的 todos 数组覆盖当前状态（替换式）。\n每条 todo 需要：\n- content：静态描述（如『读取 spec』）\n- activeForm：执行中态描述（如『正在读取 spec』）\n- status：pending | in_progress | completed\n约定同时最多一条 in_progress。",
+      "description": "管理当前 session 内的待办清单，用于拆分和追踪多步骤工作。收到复杂或多步骤任务时，先拆成子任务再逐步执行；简单的单步任务（回答问题、单次查询、简单修改）不需要用。每次调用传入完整的 todos 数组覆盖当前状态（替换式）。\n每条 todo 需要：\n- content：静态描述（如『读取 spec』）\n- activeForm：执行中态描述（如『正在读取 spec』）\n- status：pending | in_progress | completed\n约定同时最多一条 in_progress：开始一条时标 in_progress，完成后立即改 completed 并把下一条转 in_progress，不要攒着批量标记。",
       "contentDesc": "todo 的静态描述文本",
       "activeFormDesc": "执行中态的描述文本（用于 UI 展示 in_progress 时）",
       "statusDesc": "三态：pending / in_progress / completed",
       "todosDesc": "完整的 todo 列表，每次调用都会覆盖旧列表",
       "summaryEmpty": "已清空待办",
       "summaryStats": "共 {total} 条待办：{completed} 完成，{in_progress} 进行中，{pending} 待处理"
+    },
+    "currentStatus": {
+      "label": "当前状态",
+      "description": "查询当前环境的轻量状态。可查：时间、逻辑日期、agent 身份、用户/agent 头像外观、模型身份、Bridge 平台上下文，以及用户当前可见的界面视野。重要：系统提示里的日期时间是 session 创建时的快照，可能已过时；需要精确当前时间、排程、提醒、按钟点算日期、问候等任何在意时分的场景，用 action=get、key=time。key=logical_date 仅用于判断 4:00 边界下 Hana 该把哪一天当今天，不返回时分秒。key=appearance 用于用户问「我/当前 agent 长什么样」。当用户用「这个文件、这里、当前/打开的/可见的/选中的项、钉住的窗口、当前 Bridge 会话/平台、当前文件夹」指代界面时，先用 action=get、key=ui_context 取当前视野再继续。",
+      "actionDesc": "list 返回所有可查询的状态键；get 取某个状态键的值。",
+      "keyDesc": "action=get 时要取的状态键。常用键：time、logical_date、agent、appearance、model、ui_context、session_files、bridge_context。引用当前 Bridge 平台/会话用 bridge_context。"
     },
     "pinnedMemory": {
       "pinLabel": "置顶记忆",
@@ -2315,7 +2321,7 @@
       "recallDescription": "查看经验库。不传参数返回所有分类概览，传分类名返回该分类的具体经验。当用户要求你完成一项具体工作（写代码、搜索资料、创建文档、分析问题等）时，开始前应先调用此工具检查是否有相关经验可参考。普通闲聊、问答、日常对话不需要调用。",
       "recallCategoryDesc": "分类名。不传则返回所有分类概览",
       "recordLabel": "记录经验",
-      "recordDescription": "将一条经验教训记录到经验库。在以下情况使用：用户指出你犯了错误并说明正确做法、你尝试多种方法后发现了有效做法、用户明确说「以后要/不要这样做」。每条经验应简洁直接，一句话概括。",
+      "recordDescription": "将一条经验教训记录到经验库。在以下情况使用：用户指出你犯了错误并说明正确做法、用户表现出不满或反复强调某件事、你尝试多种方法后发现了有效做法、用户明确说「以后要/不要这样做」、巡检或自主工作时踩了坑。每条经验应简洁直接，一句话概括。",
       "recordCategoryDesc": "经验所属分类，2-4 字短语，如「工具使用」「搜索技巧」「回答风格」",
       "recordContentDesc": "具体的经验内容，简洁直接，一句话"
     },
@@ -2350,7 +2356,7 @@
     },
     "updateSettings": {
       "label": "设置",
-      "description": "修改 HanaAgent 的设置。支持两种操作：\n- search + query：用关键词搜索设置项，查看当前值和可选项\n- apply + key + value：修改指定设置项，需用户确认\n\n如果已知确切 key，可以直接 apply 跳过搜索。",
+      "description": "修改 HanaAgent 的设置。用户提到改设置但没指明具体软件时，默认就是本应用的设置；涉及外观主题、语言地区、模型选择、安全权限、记忆功能、个人信息、工作目录、MCP 连接器等偏好时，用本工具，不要去搜网页、也不要直接编辑配置文件。支持两种操作：\n- search + query：用关键词搜索设置项，查看当前值和可选项\n- apply + key + value：修改指定设置项，需用户确认\n\n已知确切 key 时可直接 apply 跳过搜索。意图明确就直接 apply，执行后用一句话报告结果；不确定先 search。",
       "actionDesc": "操作类型：search 搜索设置项 / apply 修改设置",
       "queryDesc": "搜索关键词（search 时必填）",
       "keyDesc": "设置项 key（通过 search 获取）",

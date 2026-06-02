@@ -183,9 +183,8 @@ describe("agent.systemPrompt: master / per-session 解耦", () => {
 
     expect(prompt).toContain("## Tool Use For Files And Commands");
     expect(prompt).toContain("Use read/grep/find/ls to inspect files.");
-    expect(prompt).toContain("Use edit for source-code changes to existing files and write for new complete files.");
+    expect(prompt).toContain("Use edit for source-code changes and write for new complete files; do not use shell redirection to modify source files.");
     expect(prompt).toContain("Use shell for builds, tests, package scripts, generators, and command-line tools.");
-    expect(prompt).toContain("Avoid shell redirection to modify source files when structured file tools are available.");
 
     await agent.dispose();
   });
@@ -202,9 +201,8 @@ describe("agent.systemPrompt: master / per-session 解耦", () => {
 
     expect(prompt).toContain("## 文件与命令工具使用");
     expect(prompt).toContain("查看文件和目录时优先用 read/grep/find/ls。");
-    expect(prompt).toContain("修改已有源码文件时优先用 edit，新建完整文件或全量替换时用 write。");
+    expect(prompt).toContain("改已有源码用 edit、新建或全量替换用 write，不要用 shell 重定向改源码。");
     expect(prompt).toContain("运行测试、构建、包脚本、生成器和命令行工具时用 shell。");
-    expect(prompt).toContain("结构化文件工具可用时，避免用 shell 重定向修改源码文件。");
 
     await agent.dispose();
   });

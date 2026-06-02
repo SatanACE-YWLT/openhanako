@@ -2294,7 +2294,6 @@
     },
     "todoWrite": {
       "label": "할 일",
-      "description": "현재 세션의 할 일 목록을 관리합니다. 호출할 때마다 완전한 todos 배열을 전달하여 현재 상태를 대체합니다(교체 방식).\n각 할 일에 필요한 항목:\n- content: 정적 설명(예: '스펙 읽기')\n- activeForm: 진행 중 설명(예: '스펙 읽는 중')\n- status: pending | in_progress | completed\n규약: 동시에 최대 하나의 in_progress.",
       "contentDesc": "할 일의 정적 설명",
       "activeFormDesc": "진행 중 형식 설명(UI에서 in_progress 표시 시 사용)",
       "statusDesc": "pending / in_progress / completed 중 하나",
@@ -2315,7 +2314,6 @@
       "recallDescription": "경험 라이브러리를 탐색해요. 파라미터 없이 호출하면 전체 카테고리 개요를 반환하고, 카테고리 이름을 지정하면 해당 카테고리의 구체적인 경험을 반환해요. 사용자가 구체적인 작업 (코드 작성, 조사, 문서 작성, 문제 분석 등)을 요청했을 때, 시작 전에 이 도구로 참고할 경험이 있는지 확인해요. 일상 대화, Q&A, 가벼운 채팅에서는 호출할 필요 없어요.",
       "recallCategoryDesc": "카테고리 이름. 생략하면 전체 카테고리 개요를 반환해요",
       "recordLabel": "경험 기록",
-      "recordDescription": "경험 라이브러리에 교훈을 기록해요. 다음 경우에 사용해요: 사용자가 실수를 지적하고 올바른 방법을 설명했을 때, 여러 방법을 시도한 후 효과적인 방법을 발견했을 때, 사용자가 '앞으로는 이렇게 해/하지 마'라고 명확히 말했을 때. 각 항목은 간결하고 직접적으로, 한 문장으로 작성해요.",
       "recordCategoryDesc": "경험의 카테고리, 2~4단어 짧은 문구, 예: '도구 사용', '검색 팁', '답변 스타일'",
       "recordContentDesc": "구체적인 경험 내용, 간결하고 직접적으로, 한 문장"
     },
@@ -2350,7 +2348,6 @@
     },
     "updateSettings": {
       "label": "설정",
-      "description": "HanaAgent의 설정을 변경해요. 두 가지 작업을 지원해요:\n- search + query: 키워드로 설정 항목을 검색하고, 현재 값과 옵션을 확인\n- apply + key + value: 지정한 설정을 변경 (사용자 확인 필요)\n\n정확한 키를 알고 있다면 바로 apply할 수 있어요.",
       "actionDesc": "작업 유형: search로 설정 검색 / apply로 설정 변경",
       "queryDesc": "검색 키워드 (search 시 필수)",
       "keyDesc": "설정 키 (search로 확인)",

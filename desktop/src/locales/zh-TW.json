@@ -2286,13 +2286,19 @@
     },
     "todoWrite": {
       "label": "待辦",
-      "description": "管理當前 session 內的待辦清單。每次呼叫傳入完整的 todos 陣列覆蓋當前狀態（替換式）。\n每條 todo 需要：\n- content：靜態描述（如『讀取 spec』）\n- activeForm：執行中態描述（如『正在讀取 spec』）\n- status：pending | in_progress | completed\n約定同時最多一條 in_progress。",
+      "description": "管理當前 session 內的待辦清單，用於拆分和追蹤多步驟工作。收到複雜或多步驟任務時，先拆成子任務再逐步執行；簡單的單步任務（回答問題、單次查詢、簡單修改）不需要用。每次呼叫傳入完整的 todos 陣列覆蓋當前狀態（替換式）。\n每條 todo 需要：\n- content：靜態描述（如『讀取 spec』）\n- activeForm：執行中態描述（如『正在讀取 spec』）\n- status：pending | in_progress | completed\n約定同時最多一條 in_progress：開始一條時標 in_progress，完成後立即改 completed 並把下一條轉 in_progress，不要攢著批量標記。",
       "contentDesc": "todo 的靜態描述文字",
       "activeFormDesc": "執行中態的描述文字（用於 UI 展示 in_progress 時）",
       "statusDesc": "三態：pending / in_progress / completed",
       "todosDesc": "完整的 todo 清單，每次呼叫都會覆蓋舊清單",
       "summaryEmpty": "已清空待辦",
       "summaryStats": "共 {total} 條待辦：{completed} 完成，{in_progress} 進行中，{pending} 待處理"
+    },
+    "currentStatus": {
+      "label": "當前狀態",
+      "description": "查詢當前環境的輕量狀態。可查：時間、邏輯日期、agent 身份、使用者/agent 頭像外觀、模型身份、Bridge 平台上下文，以及使用者當前可見的介面視野。重要：系統提示裡的日期時間是 session 建立時的快照，可能已過時；需要精確當前時間、排程、提醒、按鐘點算日期、問候等任何在意時分的場景，用 action=get、key=time。key=logical_date 僅用於判斷 4:00 邊界下 Hana 該把哪一天當今天，不返回時分秒。key=appearance 用於使用者問「我/當前 agent 長什麼樣」。當使用者用「這個檔案、這裡、當前/開啟的/可見的/選中的項、釘住的視窗、當前 Bridge 會話/平台、當前資料夾」指代介面時，先用 action=get、key=ui_context 取當前視野再繼續。",
+      "actionDesc": "list 返回所有可查詢的狀態鍵；get 取某個狀態鍵的值。",
+      "keyDesc": "action=get 時要取的狀態鍵。常用鍵：time、logical_date、agent、appearance、model、ui_context、session_files、bridge_context。引用當前 Bridge 平台/會話用 bridge_context。"
     },
     "pinnedMemory": {
       "pinLabel": "釘選記憶",
@@ -2307,7 +2313,7 @@
       "recallDescription": "查看經驗庫。不傳參數回傳所有分類概覽，傳分類名回傳該分類的具體經驗。當使用者要求你完成一項具體工作（寫程式碼、搜尋資料、建立文件、分析問題等）時，開始前應先呼叫此工具檢查是否有相關經驗可參考。普通閒聊、問答、日常對話不需要呼叫。",
       "recallCategoryDesc": "分類名。不傳則回傳所有分類概覽",
       "recordLabel": "記錄經驗",
-      "recordDescription": "將一條經驗教訓記錄到經驗庫。在以下情況使用：使用者指出你犯了錯誤並說明正確做法、你嘗試多種方法後發現了有效做法、使用者明確說「以後要/不要這樣做」。每條經驗應簡潔直接，一句話概括。",
+      "recordDescription": "將一條經驗教訓記錄到經驗庫。在以下情況使用：使用者指出你犯了錯誤並說明正確做法、使用者表現出不滿或反覆強調某件事、你嘗試多種方法後發現了有效做法、使用者明確說「以後要/不要這樣做」、巡檢或自主工作時踩了坑。每條經驗應簡潔直接，一句話概括。",
       "recordCategoryDesc": "經驗所屬分類，2-4 字短語，如「工具使用」「搜尋技巧」「回答風格」",
       "recordContentDesc": "具體的經驗內容，簡潔直接，一句話"
     },
@@ -2342,7 +2348,7 @@
     },
     "updateSettings": {
       "label": "設定",
-      "description": "修改 HanaAgent 的設定。支援兩種操作：\n- search + query：用關鍵字搜尋設定項，查看當前值和可選項\n- apply + key + value：修改指定設定項，需使用者確認\n\n如果已知確切 key，可以直接 apply 跳過搜尋。",
+      "description": "修改 HanaAgent 的設定。使用者提到改設定但沒指明具體軟體時，預設就是本應用的設定；涉及外觀主題、語言地區、模型選擇、安全權限、記憶功能、個人資訊、工作目錄、MCP 連接器等偏好時，用本工具，不要去搜網頁、也不要直接編輯設定檔。支援兩種操作：\n- search + query：用關鍵字搜尋設定項，查看當前值和可選項\n- apply + key + value：修改指定設定項，需使用者確認\n\n已知確切 key 時可直接 apply 跳過搜尋。意圖明確就直接 apply，執行後用一句話報告結果；不確定先 search。",
       "actionDesc": "操作類型：search 搜尋設定項 / apply 修改設定",
       "queryDesc": "搜尋關鍵字（search 時必填）",
       "keyDesc": "設定項 key（透過 search 取得）",
