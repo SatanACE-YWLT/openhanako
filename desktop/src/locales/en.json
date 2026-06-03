@@ -690,8 +690,48 @@
       "sharing": "Sharing",
       "access": "Access & Devices",
       "plugins": "Plugins",
+      "experiments": "Experiments",
       "about": "About",
       "security": "Security"
+    },
+    "experiments": {
+      "title": "Experiments",
+      "description": "Forward-looking features land here first. Once stable, they move to the settings page where they belong.",
+      "empty": "No visible experiments",
+      "owner": {
+        "memory": "Memory"
+      },
+      "status": {
+        "alpha": "Alpha",
+        "beta": "Beta",
+        "deprecated": "Deprecated",
+        "retired": "Retired"
+      },
+      "risk": {
+        "low": "Low risk",
+        "medium": "Medium risk",
+        "high": "High risk"
+      },
+      "restart": {
+        "immediate": "Applies immediately",
+        "new_session": "New sessions only",
+        "restart_server": "Restart server",
+        "restart_app": "Restart app"
+      },
+      "cacheSnapshot": {
+        "title": "Cache Memory System",
+        "description": "Build memory with cached context to improve cache hit rate and reduce spend.",
+        "off": "Off",
+        "shadow": "Observe",
+        "write": "Write",
+        "observeOnly": "Observe only, do not write memory",
+        "observationNote": "Observation mode has no effect on formal memory. It only shows whether the new memory system behaves as expected.",
+        "writeWarning": "This mode writes to formal memory.",
+        "previewTitle": "Memory MD Preview",
+        "summaryTitle": "Rolling Summary Preview",
+        "emptyPreview": "No observation yet",
+        "clearObservation": "Clear observation"
+      }
     },
     "appearance": {
       "title": "Appearance",

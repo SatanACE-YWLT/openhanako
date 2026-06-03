@@ -26,6 +26,7 @@ import { MediaTab } from './tabs/MediaTab';
 import { AboutTab } from './tabs/AboutTab';
 import { PluginsTab } from './tabs/PluginsTab';
 import { PluginMarketplaceTab } from './tabs/PluginMarketplaceTab';
+import { ExperimentsTab } from './tabs/ExperimentsTab';
 import { SecurityTab } from './tabs/SecurityTab';
 import { SharingTab } from './tabs/SharingTab';
 import { AccessTab } from './tabs/AccessTab';
@@ -54,6 +55,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   sharing: SharingTab,
   access: AccessTab,
   plugins: PluginsTab,
+  experiments: ExperimentsTab,
   'plugin-marketplace': PluginMarketplaceTab,
   security: SecurityTab,
   about: AboutTab,
@@ -91,6 +93,7 @@ const TAB_TITLES: Record<string, string> = {
   sharing: '分享',
   access: '访问与设备',
   plugins: '插件',
+  experiments: '实验',
   'plugin-marketplace': '插件市场',
   security: '安全',
   about: '关于',

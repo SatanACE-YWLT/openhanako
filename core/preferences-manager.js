@@ -544,6 +544,23 @@ export class PreferencesManager {
     return this.getPluginUiPrefs();
   }
 
+  /** 读取实验功能值（global scope）。未知 id 的语义由实验 registry 判断。 */
+  getExperimentValue(id) {
+    const experiments = this._cache.experiments;
+    if (!experiments || typeof experiments !== "object" || Array.isArray(experiments)) return undefined;
+    return experiments[id];
+  }
+
+  /** 保存实验功能值（global scope）。只保存值，不把 registry 定义混入 preferences。 */
+  setExperimentValue(id, value) {
+    const prefs = this._mutableCopy();
+    const current = prefs.experiments && typeof prefs.experiments === "object" && !Array.isArray(prefs.experiments)
+      ? prefs.experiments
+      : {};
+    prefs.experiments = { ...current, [id]: value };
+    this.savePreferences(prefs);
+  }
+
   /** 读取更新通道偏好："stable" | "beta" */
   getUpdateChannel() {
     return this._cache.update_channel || "stable";

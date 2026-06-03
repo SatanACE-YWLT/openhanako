@@ -46,6 +46,10 @@ import { runCompatChecks } from "../lib/compat/index.js";
 import { getPlatformPromptNote } from "./platform-prompt.js";
 import { assertAgentConfigPatchYuan, getAgentConfigRepairState } from "./yuan-registry.js";
 import { createModuleLogger } from "../lib/debug-log.js";
+import {
+  CACHE_SNAPSHOT_EXPERIMENT_ID,
+  getResolvedExperimentValue,
+} from "../lib/experiments/registry.js";
 
 const moduleLog = createModuleLogger("agent");
 
@@ -277,12 +281,18 @@ export class Agent {
         getMemoryMasterEnabled: () => this._memoryMasterEnabled,
         isSessionMemoryEnabled: (sessionPath) => this.isSessionMemoryEnabledFor(sessionPath),
         getTimezone: () => this._cb?.getTimezone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        getCacheSnapshotReflectionMode: () => getResolvedExperimentValue(
+          this._cb?.getPreferences?.(),
+          CACHE_SNAPSHOT_EXPERIMENT_ID,
+        ),
         onCompiled: () => {
           // _systemPrompt 是非 session 路径（巡检/cron/频道/DM/bridge owner 新建）
           // 共享的 cache，必须按 master 构建，不被 per-session 开关污染。
           this._systemPrompt = this.buildSystemPrompt({ forceMemoryEnabled: this._memoryMasterEnabled });
           moduleLog.log(`${this.agentName} 记忆编译完成，system prompt 已刷新`);
         },
+        agentId: this.id,
+        agentDir: this.agentDir,
         sessionDir: this.sessionDir,
         memoryDir: path.dirname(this.memoryMdPath),
         memoryMdPath: this.memoryMdPath,

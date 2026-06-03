@@ -1,0 +1,166 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import os from "os";
+import fs from "fs";
+import path from "path";
+
+vi.mock("../lib/memory/compile.js", () => ({
+  compileToday: vi.fn().mockResolvedValue("compiled"),
+  compileWeek: vi.fn().mockResolvedValue("compiled"),
+  compileLongterm: vi.fn().mockResolvedValue("compiled"),
+  compileFacts: vi.fn().mockResolvedValue("compiled"),
+  assemble: vi.fn(),
+}));
+
+vi.mock("../lib/memory/deep-memory.js", () => ({
+  processDirtySessions: vi.fn().mockResolvedValue({ processed: 0, factsAdded: 0 }),
+}));
+
+vi.mock("../lib/debug-log.js", () => ({
+  debugLog: () => null,
+  createModuleLogger: () => ({
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
+import { createMemoryTicker } from "../lib/memory/memory-ticker.js";
+import { readCacheSnapshotObservation } from "../lib/memory/cache-snapshot-observation.js";
+
+function writeSession(sessionPath) {
+  const lines = [
+    {
+      type: "message",
+      timestamp: "2026-06-03T10:00:00.000Z",
+      message: { role: "user", content: "我想把 rolling summary 接上缓存快照。" },
+    },
+    {
+      type: "message",
+      timestamp: "2026-06-03T10:01:00.000Z",
+      message: { role: "assistant", content: "我们可以先做 shadow，再切 write。" },
+    },
+  ];
+  fs.writeFileSync(sessionPath, lines.map((line) => JSON.stringify(line)).join("\n") + "\n", "utf-8");
+}
+
+function makeTicker(tmpDir, mode, summaryManager) {
+  const agentDir = path.join(tmpDir, "agents", "hana");
+  const sessionDir = path.join(agentDir, "sessions");
+  const memoryDir = path.join(agentDir, "memory");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.writeFileSync(path.join(memoryDir, "memory.md"), "# Memory\n\n现有正式记忆。\n", "utf-8");
+
+  const ticker = createMemoryTicker({
+    agentId: "hana",
+    agentDir,
+    summaryManager,
+    configPath: path.join(agentDir, "config.yaml"),
+    factStore: {},
+    getResolvedMemoryModel: () => ({
+      model: "memory-model",
+      provider: "deepseek",
+      api: "openai-completions",
+      api_key: "test-key",
+      base_url: "http://localhost:1234",
+    }),
+    getMemoryMasterEnabled: () => true,
+    isSessionMemoryEnabled: () => true,
+    getCacheSnapshotReflectionMode: () => mode,
+    sessionDir,
+    memoryDir,
+    memoryMdPath: path.join(memoryDir, "memory.md"),
+    todayMdPath: path.join(memoryDir, "today.md"),
+    weekMdPath: path.join(memoryDir, "week.md"),
+    longtermMdPath: path.join(memoryDir, "longterm.md"),
+    factsMdPath: path.join(memoryDir, "facts.md"),
+  });
+
+  return { ticker, agentDir, sessionPath: path.join(sessionDir, "2026-06-03T10-00-00-000Z_cache.jsonl") };
+}
+
+describe("cache snapshot reflection runtime", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-cache-snapshot-runtime-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("shadow mode keeps the official rolling summary path and writes only an observation artifact", async () => {
+    const summaryManager = {
+      rollingSummary: vi.fn().mockResolvedValue("official summary"),
+      createRollingSummaryDraft: vi.fn().mockResolvedValue({
+        summary: "shadow summary",
+        changed: true,
+        data: { summary: "shadow summary" },
+        usage: {
+          input: { uncachedTokens: 3 },
+          cache: { readTokens: 997, missTokens: 3 },
+        },
+      }),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    const { ticker, agentDir, sessionPath } = makeTicker(tmpDir, "shadow", summaryManager);
+    writeSession(sessionPath);
+
+    await ticker.flushSession(sessionPath);
+
+    expect(summaryManager.rollingSummary).toHaveBeenCalledOnce();
+    expect(summaryManager.createRollingSummaryDraft).toHaveBeenCalledOnce();
+    expect(summaryManager.saveSummary).not.toHaveBeenCalled();
+
+    const observation = readCacheSnapshotObservation(agentDir);
+    expect(observation).toMatchObject({
+      agentId: "hana",
+      sessionPath,
+      mode: "shadow",
+      status: "success",
+      summaryPreview: "shadow summary",
+    });
+    expect(observation.usage.cachedTokens).toBe(997);
+    expect(observation.memoryMdPreview).toContain("现有正式记忆");
+  });
+
+  it("write mode saves the cache snapshot draft as the official rolling summary", async () => {
+    const sessionId = "2026-06-03T10-00-00-000Z_cache";
+    const summaryData = {
+      session_id: sessionId,
+      created_at: "2026-06-03T10:02:00.000Z",
+      updated_at: "2026-06-03T10:02:00.000Z",
+      summary: "write summary",
+      messageCount: 2,
+    };
+    const summaryManager = {
+      rollingSummary: vi.fn().mockResolvedValue("legacy summary"),
+      createRollingSummaryDraft: vi.fn().mockResolvedValue({
+        summary: "write summary",
+        changed: true,
+        data: summaryData,
+        usage: { cache: { readTokens: 1200, missTokens: 4 } },
+      }),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    const { ticker, agentDir, sessionPath } = makeTicker(tmpDir, "write", summaryManager);
+    writeSession(sessionPath);
+
+    await ticker.flushSession(sessionPath);
+
+    expect(summaryManager.rollingSummary).not.toHaveBeenCalled();
+    expect(summaryManager.createRollingSummaryDraft).toHaveBeenCalledOnce();
+    expect(summaryManager.saveSummary).toHaveBeenCalledWith(sessionId, summaryData);
+
+    const observation = readCacheSnapshotObservation(agentDir);
+    expect(observation).toMatchObject({
+      mode: "write",
+      status: "success",
+      summaryPreview: "write summary",
+    });
+  });
+});

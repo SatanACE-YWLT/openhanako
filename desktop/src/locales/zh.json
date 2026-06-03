@@ -690,8 +690,48 @@
       "sharing": "分享",
       "access": "访问与设备",
       "plugins": "插件",
+      "experiments": "实验",
       "about": "关于",
       "security": "安全"
+    },
+    "experiments": {
+      "title": "实验",
+      "description": "前沿能力会先放在这里观察。稳定后会迁移到它真正归属的设置页。",
+      "empty": "暂无可见实验功能",
+      "owner": {
+        "memory": "记忆"
+      },
+      "status": {
+        "alpha": "Alpha",
+        "beta": "Beta",
+        "deprecated": "即将移除",
+        "retired": "已退休"
+      },
+      "risk": {
+        "low": "低风险",
+        "medium": "中风险",
+        "high": "高风险"
+      },
+      "restart": {
+        "immediate": "立即生效",
+        "new_session": "新会话生效",
+        "restart_server": "重启服务生效",
+        "restart_app": "重启应用生效"
+      },
+      "cacheSnapshot": {
+        "title": "缓存记忆系统",
+        "description": "利用缓存搭建记忆，可以增加缓存命中率，减少消费。",
+        "off": "关闭",
+        "shadow": "观察",
+        "write": "写入",
+        "observeOnly": "只观察，不写入记忆",
+        "observationNote": "观察模式不会对正式记忆产生任何影响。它只用于观察新的记忆系统是否达到预期效果。",
+        "writeWarning": "当前会写入正式记忆。",
+        "previewTitle": "Memory MD Preview",
+        "summaryTitle": "Rolling Summary Preview",
+        "emptyPreview": "暂无观察结果",
+        "clearObservation": "清除观察结果"
+      }
     },
     "appearance": {
       "title": "外观",

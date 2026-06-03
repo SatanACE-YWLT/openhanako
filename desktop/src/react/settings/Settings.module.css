@@ -5903,6 +5903,92 @@ a.about-link:hover {
     width: 100%;
 }
 
+/* 实验功能：Cache Snapshot 观察区 */
+.experiments-observation {
+    padding: var(--space-md);
+    border-top: var(--border-width, 1px) solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.experiments-observation-note {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.experiments-observation-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+.experiments-observation-meta span {
+    border: var(--border-width, 1px) solid var(--border);
+    border-radius: var(--radius-input, 4px);
+    padding: 2px 6px;
+    background: var(--overlay-subtle);
+}
+
+.experiments-observation-error {
+    color: var(--danger, #b56b66);
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.experiments-preview-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.experiments-preview-block h3 {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.experiments-preview-block pre {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    line-height: 1.65;
+    background: var(--overlay-subtle);
+    border: var(--border-width, 1px) solid var(--border);
+    border-radius: var(--radius-input, 4px);
+    padding: var(--space-sm);
+}
+
+.experiments-empty {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.experiments-clear-btn {
+    align-self: flex-start;
+    color: var(--text-muted);
+    border: var(--border-width, 1px) solid var(--border);
+    background: transparent;
+    border-radius: var(--radius-input, 4px);
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    cursor: default;
+}
+
+.experiments-clear-btn:hover {
+    color: var(--text);
+    background: var(--overlay-subtle);
+}
+
 :global(.memory-date-group) {
     margin-bottom: var(--space-md);
 }

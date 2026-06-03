@@ -854,6 +854,7 @@ export class AgentManager {
       getCurrentModelId:    () => getEngine()?.currentModel?.id ?? null,
       getSkillsDir:         () => getEngine()?.skillsDir ?? null,
       getLearnSkills:       () => getEngine()?.getLearnSkills?.() ?? {},
+      getPreferences:       () => getEngine()?.preferences ?? null,
       isChannelsEnabled:    () => getEngine()?.isChannelsEnabled?.() ?? false,
       createChannelEntry:    (input) => getEngine()?.createChannelEntry?.(input),
       resolveUtilityConfig: () => getEngine()?.resolveUtilityConfig?.({ agentId: ag.id }),
