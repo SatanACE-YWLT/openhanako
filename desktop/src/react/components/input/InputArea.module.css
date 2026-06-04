@@ -351,52 +351,48 @@
     gap: 0.45rem;
 }
 
+.plan-mode-option.active {
+    font-weight: 400;
+}
+
 .plan-mode-option svg {
     flex: 0 0 auto;
 }
 
 .plan-mode-option-auto {
     color: var(--permission-auto);
-    background: var(--permission-auto-bg);
 }
 
 .plan-mode-option-operate {
     color: var(--danger, #c55);
-    background: color-mix(in srgb, var(--danger, #c55) 5%, transparent);
 }
 
 .plan-mode-option-ask {
-    color: var(--text);
-    background: color-mix(in srgb, var(--text) 3%, transparent);
+    color: var(--text-muted);
 }
 
 .plan-mode-option-read_only {
     color: var(--accent);
-    background: rgba(var(--accent-rgb), 0.05);
 }
 
 .plan-mode-option-auto:hover,
 .plan-mode-option-auto.active {
     color: var(--permission-auto);
-    background: var(--permission-auto-bg);
 }
 
 .plan-mode-option-operate:hover,
 .plan-mode-option-operate.active {
     color: var(--danger, #c55);
-    background: color-mix(in srgb, var(--danger, #c55) 9%, transparent);
 }
 
 .plan-mode-option-ask:hover,
 .plan-mode-option-ask.active {
-    color: var(--text);
-    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text-muted);
 }
 
 .plan-mode-option-read_only:hover,
 .plan-mode-option-read_only.active {
     color: var(--accent);
-    background: rgba(var(--accent-rgb), 0.08);
 }
 
 .thinking-option-desc {

@@ -25,9 +25,8 @@ function PermissionModeIcon({ mode }: { mode: PermissionMode }) {
   }
   if (mode === 'read_only') {
     return (
-      <svg data-permission-mode={mode} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="5" y="11" width="14" height="9" rx="1.5" />
-        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      <svg data-permission-mode={mode} width="14" height="14" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+        <path d="M30 25c0 1.104-.927 1.656-2 2 0 0-5.443 1.515-11 2.977V5l11-3c1.104 0 2 .896 2 2v21ZM15 29.998C9.538 28.53 4 27 4 27c-1.136-.312-2-.896-2-2V4c0-1.104.896-2 2-2l11 3v24.998ZM28 0s-5.789 1.594-11.05 3c-.659.025-1.323 0-1.983 0C9.955 1.656 4 0 4 0 1.791 0 0 1.791 0 4v21c0 2.209 1.885 3.313 4 4 0 0 5.393 1.5 10.967 3h2.025C22.612 30.5 28 29 28 29c2.053-.531 4-1.791 4-4V4c0-2.209-1.791-4-4-4Z" />
       </svg>
     );
   }

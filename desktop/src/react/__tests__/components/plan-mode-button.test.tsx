@@ -84,6 +84,7 @@ describe('PlanModeButton', () => {
 
     rerender(<PlanModeButton mode="read_only" onChange={vi.fn()} />);
     expect(container.querySelector('svg[data-permission-mode="read_only"]')).not.toBeNull();
+    expect(container.querySelector('svg[data-permission-mode="read_only"]')?.getAttribute('viewBox')).toBe('0 0 32 32');
   });
 
   it('renders an icon for every open permission menu option', () => {
@@ -98,7 +99,7 @@ describe('PlanModeButton', () => {
     expect(dropdown?.querySelector('svg[data-permission-mode="read_only"]')).not.toBeNull();
   });
 
-  it('keeps ask neutral, auto blue, read-only accent, and operate danger colored', () => {
+  it('keeps ask neutral, trigger modes colored, and menu mode colors text-only', () => {
     const css = fs.readFileSync(
       path.join(process.cwd(), 'desktop/src/react/components/input/InputArea.module.css'),
       'utf8',
@@ -111,6 +112,7 @@ describe('PlanModeButton', () => {
     const optionOperateBlock = css.match(/\.plan-mode-option-operate\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
     const optionAskBlock = css.match(/\.plan-mode-option-ask\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
     const optionReadOnlyBlock = css.match(/\.plan-mode-option-read_only\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
+    const optionActiveBlock = css.match(/\.plan-mode-option\.active\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
 
     expect(askBlock).not.toMatch(/color\s*:|background\s*:|border-color\s*:/);
     expect(autoBlock).toContain('var(--permission-auto');
@@ -121,7 +123,12 @@ describe('PlanModeButton', () => {
     expect(readOnlyBlock).not.toContain('var(--danger');
     expect(optionAutoBlock).toContain('var(--permission-auto');
     expect(optionOperateBlock).toContain('var(--danger');
-    expect(optionAskBlock).toContain('var(--text');
+    expect(optionAskBlock).toContain('var(--text-muted');
     expect(optionReadOnlyBlock).toContain('var(--accent');
+    expect(optionAutoBlock).not.toMatch(/background\s*:/);
+    expect(optionOperateBlock).not.toMatch(/background\s*:/);
+    expect(optionAskBlock).not.toMatch(/background\s*:/);
+    expect(optionReadOnlyBlock).not.toMatch(/background\s*:/);
+    expect(optionActiveBlock).toMatch(/font-weight\s*:\s*400/);
   });
 });
