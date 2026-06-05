@@ -6,6 +6,7 @@
  * Poller class with injectable registry, fake timers, and fake-async detection.
  */
 
+import path from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shouldCheckThisTick, Poller } from "../lib/poller.ts";
 
@@ -413,9 +414,10 @@ describe("Poller", () => {
 
     await vi.advanceTimersByTimeAsync(5_000);
 
+    const expectedFilePath = path.join("/tmp/image-gen-generated", "abc.png");
     expect(registerSessionFile).toHaveBeenCalledWith({
       sessionPath: "/sessions/image-gen.jsonl",
-      filePath: "/tmp/image-gen-generated/abc.png",
+      filePath: expectedFilePath,
       label: "abc.png",
       origin: "plugin_output",
       storageKind: "plugin_data",
@@ -426,7 +428,7 @@ describe("Poller", () => {
         sessionFiles: [expect.objectContaining({
           fileId: "sf_generated",
           sessionPath: "/sessions/image-gen.jsonl",
-          filePath: "/tmp/image-gen-generated/abc.png",
+          filePath: expectedFilePath,
           storageKind: "plugin_data",
           origin: "plugin_output",
         })],

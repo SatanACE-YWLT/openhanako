@@ -28,6 +28,8 @@ function makeRunner(handler) {
   };
 }
 
+const isMacOS = process.platform === "darwin";
+
 describe("macos Cua provider", () => {
   it("resolves a configured Cua Driver command before common locations", () => {
     const command = resolveCuaDriverCommand({
@@ -39,7 +41,7 @@ describe("macos Cua provider", () => {
     expect(command).toBe("/opt/cua-driver");
   });
 
-  it("prefers a Hana-bundled Computer Use helper over an external Cua Driver install", () => {
+  it.skipIf(!isMacOS)("prefers a Hana-bundled Computer Use helper over an external Cua Driver install", () => {
     const command = resolveCuaDriverCommand({
       env: {
         HANA_ROOT: "/Applications/HanaAgent.app/Contents/Resources/server",
@@ -55,7 +57,7 @@ describe("macos Cua provider", () => {
     expect(command).toBe("/Applications/HanaAgent.app/Contents/Resources/computer-use/macos/hana-computer-use-helper");
   });
 
-  it("resolves the development helper build output before falling back to PATH", () => {
+  it.skipIf(!isMacOS)("resolves the development helper build output before falling back to PATH", () => {
     const command = resolveCuaDriverCommand({
       env: { HANA_ROOT: "/Users/hana/project-hana" },
       existsSync: (p) => p === "/Users/hana/project-hana/dist-computer-use/mac-arm64/hana-computer-use-helper",
