@@ -19,13 +19,14 @@
     --welcome-chat-input-column-width: 40rem;
 
     /* 圆角 */
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
+    --radius-sm: 5px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
 
     /* 主题可覆盖的抽象 token（默认值和现有视觉一致；主题 CSS 可 override） */
-    --radius-input: 4px;        /* input / select widget / textarea / ghost button / media dropdown */
-    --radius-card: 10px;        /* SettingsSection body / skill-list-item 首尾 / tool-caps 首尾 */
+    --radius-input: 6px;        /* input / select widget / textarea / ghost button / media dropdown */
+    --radius-chat-surface: 16px; /* 聊天输入框外壳 */
+    --radius-card: 8px;         /* SettingsSection body / skill-list-item 首尾 / tool-caps 首尾 */
     --radius-chat-card: 4px; /* in-message chat cards */
     --radius-chat-card-inner: max(2px, calc(var(--radius-chat-card) - 2px));
     --border-width: 1px;        /* 表单控件 / section body 边框粗细 */

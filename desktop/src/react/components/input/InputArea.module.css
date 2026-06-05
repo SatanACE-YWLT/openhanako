@@ -1365,7 +1365,7 @@
     gap: var(--space-sm);
     background: var(--bg-card);
     border: 1px solid var(--overlay-light);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-chat-surface, 16px);
     padding: var(--space-md) var(--space-md) var(--space-sm);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: border-color 0.3s var(--ease-out),
@@ -1384,7 +1384,7 @@
 .input-surface-mobile .input-wrapper {
     gap: 0.45rem;
     padding: 0.65rem 0.75rem 0.55rem;
-    border-radius: min(var(--radius-lg), 14px);
+    border-radius: min(var(--radius-chat-surface, 16px), 14px);
 }
 
 .audio-recording-card {
