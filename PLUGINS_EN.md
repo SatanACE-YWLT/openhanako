@@ -592,6 +592,7 @@ Most plugins don't need a manifest. Only required for:
   "version": "1.0.0",
   "description": "What this plugin does",
   "trust": "full-access",
+  "activationEvents": ["onToolCall:search"],
   "ui": {
     "hostCapabilities": ["external.open"]
   },
@@ -605,6 +606,34 @@ Most plugins don't need a manifest. Only required for:
 ```
 
 Without a manifest, `id` is derived from the directory name, other fields default to empty, and permission is restricted.
+
+### Activation Events
+
+`index.js` is not necessarily executed immediately on app startup. Declare `activationEvents` in `manifest.json` to start the lifecycle on demand:
+
+| Event | When it fires |
+|-------|---------------|
+| `onStartup` | Executes `onload()` immediately when the plugin loads |
+| `onPageOpen` | User opens the plugin's page route |
+| `onWidgetOpen` | User opens the plugin's widget route |
+| `onToolCall` | Any static tool contributed by the plugin is called |
+| `onToolCall:name` | A specific static tool is called |
+| `onBusRequest` | Reserved for bus request triggers |
+| `onBusRequest:type` | Reserved for a specific bus capability request |
+| `*` | Any known activation trigger |
+
+Older plugins without `activationEvents` remain compatible: if `index.js` exists, the default is equivalent to `["onStartup"]`. New plugins should declare the minimum activation conditions for their capabilities to avoid spinning up all persistent connections, tasks, and handlers at app startup.
+
+```json
+{
+  "id": "lazy-search",
+  "trust": "full-access",
+  "activationEvents": ["onToolCall:search"],
+  "contributes": {
+    "page": { "title": "Search", "route": "/search" }
+  }
+}
+```
 
 ## Stateful Plugins (Lifecycle) ⚡ full-access
 
@@ -662,7 +691,7 @@ export default class MyPlugin {
 
 ## Bus Communication (bus.request / bus.handle)
 
-Inter-plugin communication uses EventBus request-response. `bus.handle` requires full-access permission; `bus.request` is available to all plugins. New plugins should use `defineBusHandler()`, `requestBus()`, and `HANA_BUS_SKIP` from `@hana/plugin-runtime` so handler types, request arguments, and chained skip semantics come from the SDK instead of hand-written conventions.
+Inter-plugin communication uses EventBus request-response. `bus.handle` requires full-access permission; `bus.request` is available to all plugins. `bus.listCapabilities()` / `bus.getCapability(type)` can read the current stable capability directory, which records the capability name, input/output schema, permission requirements, error codes, stability, and whether a handler is currently available. New plugins should use `defineBusHandler()`, `requestBus()`, and `HANA_BUS_SKIP` from `@hana/plugin-runtime` so handler types, request arguments, and chained skip semantics come from the SDK instead of hand-written conventions.
 
 ```js
 import { defineBusHandler, HANA_BUS_SKIP, requestBus } from "@hana/plugin-runtime";
@@ -677,10 +706,34 @@ const bridgeSend = defineBusHandler({
   },
 });
 
-this.register(this.ctx.bus.handle(bridgeSend.type, (payload) => bridgeSend.handle(payload, this.ctx)));
+this.register(this.ctx.bus.handle(
+  bridgeSend.type,
+  (payload) => bridgeSend.handle(payload, this.ctx),
+  {
+    capability: {
+      title: "Bridge send",
+      description: "Send text to a bridge platform.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          platform: { type: "string" },
+          chatId: { type: "string" },
+          text: { type: "string" },
+        },
+        required: ["platform", "text"],
+      },
+      outputSchema: { type: "object" },
+      permission: "bridge.send",
+      errors: ["NO_HANDLER", "TIMEOUT", "INTERNAL_ERROR"],
+      owner: "plugin:my-plugin",
+      stability: "experimental",
+    },
+  },
+));
 
 // Plugin B (any permission): call the capability
-if (this.ctx.bus.hasHandler("bridge:send")) {
+const capability = this.ctx.bus.getCapability?.("bridge:send");
+if (capability?.available) {
   const result = await requestBus(this.ctx, "bridge:send", {
     platform: "telegram",
     chatId: "123",
@@ -708,7 +761,7 @@ this.register(
 - Timeout (default 30s) → throws `BusTimeoutError`
 - Handler business errors → propagated directly
 
-**Soft dependencies**: `depends.capabilities` in manifest is advisory only; the system won't block installation if capabilities are missing. Plugin code uses `bus.hasHandler()` for graceful degradation at runtime.
+**Soft dependencies**: `depends.capabilities` in manifest is advisory only; the system won't block installation if capabilities are missing. Plugin code should prefer `bus.getCapability(type)?.available` for graceful degradation at runtime; older plugins may continue to use `bus.hasHandler()`.
 
 ### Dynamic Tool Registration ⚡ full-access
 
@@ -763,7 +816,7 @@ await this.ctx.bus.request("task:remove", { taskId: "my-task-123" });
 
 **Result delivery** usually combines `task:*` with `deferred:*`: `task:*` tracks runtime lifecycle, while `deferred:*` tracks result delivery back to the parent session. A long task commonly calls `deferred:register` and `task:register` at start, then `deferred:resolve` and `task:remove` at completion.
 
-`TaskRegistry` is runtime-only and not persisted. If a plugin wants restart recovery, it must restore pending jobs from its own storage in `onload()` and call `task:register` again.
+TaskRegistry persists task records and schedule metadata. On restart, active tasks are marked as 'recovering'; plugins must re-register handlers in onload() and resume or fail recovering tasks.
 
 ### Official Plugin Marketplace
 
@@ -839,7 +892,7 @@ The system ignores unrecognized directories and manifest fields. Old plugins alw
 Hana supports multiple sessions and multiple agents running in parallel. Keep the following in mind when developing plugins:
 
 - All session-related EventBus events (`session:send`, `session:abort`, etc.) must include a `sessionPath` parameter to identify the target session
-- Tools can obtain the current session path via `ctx.sessionManager.getSessionFile()`
+- Tools obtain the current session path via `toolCtx.sessionPath`
 - Do not use `engine.currentSessionPath` or `engine.currentAgentId` (these are UI focus pointers and do not represent the currently executing session)
 
 ```js

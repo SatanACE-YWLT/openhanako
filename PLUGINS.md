@@ -1034,7 +1034,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
 Hana 支持多 session / 多 agent 并行运行。插件开发时需注意：
 
 - 所有 EventBus 的 session 相关事件（`session:send`、`session:abort` 等）必须携带 `sessionPath` 参数，用于标识目标 session
-- 工具（tool）通过 `ctx.sessionManager.getSessionFile()` 获取当前 session 路径
+- 工具（tool）通过 `toolCtx.sessionPath` 获取当前 session 路径
 - 不要使用 `engine.currentSessionPath` 或 `engine.currentAgentId`（这些是 UI 焦点指针，不代表当前执行的 session）
 
 ```js
