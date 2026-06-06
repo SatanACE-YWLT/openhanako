@@ -435,4 +435,55 @@ describe('streamBufferManager.ensureMessage 自愈', () => {
       source: 'Workflow 已经提交后台运行了。',
     });
   });
+
+  it('workflow 幕间早于锚点 replay 时先隐藏，锚点和正文到达后再落到同一轮后面', () => {
+    streamBufferManager.handle({
+      type: 'content_block',
+      sessionPath: PATH,
+      block: {
+        type: 'interlude',
+        id: 'deferred:workflow-early:success',
+        variant: 'deferred_result',
+        taskId: 'workflow-early',
+        status: 'success',
+        sourceKind: 'workflow',
+        sourceLabel: '早到结果',
+        text: 'Hanako 收到了来自 早到结果 workflow 的结果',
+      },
+    });
+
+    expect(getItems().map((item) => (item.type === 'message' ? item.data.id : item.id))).toEqual(['u1']);
+
+    streamBufferManager.handle({
+      type: 'content_block',
+      sessionPath: PATH,
+      block: {
+        type: 'workflow',
+        taskId: 'workflow-early',
+        taskTitle: '早到结果',
+        streamStatus: 'running',
+        startedAt: 1000,
+      },
+    });
+    streamBufferManager.handle({
+      type: 'text_delta',
+      sessionPath: PATH,
+      delta: 'Workflow 已经提交后台运行了。',
+    });
+    streamBufferManager.finishTurn(PATH);
+
+    const items = getItems();
+    expect(items.map((item) => (item.type === 'message' ? item.data.id : item.id))).toEqual([
+      'u1',
+      expect.stringMatching(/^stream-/),
+      'deferred:workflow-early:success',
+    ]);
+
+    const assistantItems = items.filter((item) => item.type === 'message' && item.data.role === 'assistant');
+    expect(assistantItems).toHaveLength(1);
+    const workflowMessage = assistantItems[0];
+    expect(workflowMessage?.type).toBe('message');
+    if (workflowMessage?.type !== 'message') throw new Error('expected assistant message');
+    expect(workflowMessage.data.blocks?.map((block) => block.type)).toEqual(['workflow', 'text']);
+  });
 });

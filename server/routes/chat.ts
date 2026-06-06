@@ -1084,6 +1084,9 @@ export function createChatRoute(engine: any, hub: any, { upgradeWebSocket }: any
             if (msg.type === "resume_stream") {
               const currentPath = requireSessionPath(msg, ws); if (!currentPath) return;
               const ss = sessionState.get(currentPath);
+              const runtimeIsStreaming = typeof engine.isSessionStreaming === "function"
+                ? !!engine.isSessionStreaming(currentPath)
+                : !!ss?.isStreaming;
               if (ss) {
                 const resumed = resumeSessionStream(ss, {
                   streamId: msg.streamId,
@@ -1098,6 +1101,7 @@ export function createChatRoute(engine: any, hub: any, { upgradeWebSocket }: any
                   reset: resumed.reset,
                   truncated: resumed.truncated,
                   isStreaming: resumed.isStreaming,
+                  runtimeIsStreaming,
                   events: resumed.events,
                 });
               } else {
@@ -1110,6 +1114,7 @@ export function createChatRoute(engine: any, hub: any, { upgradeWebSocket }: any
                   reset: false,
                   truncated: false,
                   isStreaming: false,
+                  runtimeIsStreaming,
                   events: [],
                 });
               }
