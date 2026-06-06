@@ -43,6 +43,8 @@ export function SkillsTab() {
 
   const [skillsList, setSkillsList] = useState<SkillInfo[]>([]);
   const [skillBundles, setSkillBundles] = useState<SkillBundleInfo[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const skillsListOwnerIdRef = useRef<string | null>(null);
   const [bundleDialog, setBundleDialog] = useState<BundleDialogState | null>(null);
   const skillFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -58,7 +60,19 @@ export function SkillsTab() {
 
   const loadSkills = useCallback(async () => {
     const agentId = skillsViewAgentIdRef.current;
-    if (!agentId) return;
+    if (!agentId) {
+      skillsListOwnerIdRef.current = null;
+      setSkillsList([]);
+      setSkillBundles([]);
+      setSkillsLoading(false);
+      return;
+    }
+    const ownerChanged = skillsListOwnerIdRef.current !== agentId;
+    if (ownerChanged) {
+      setSkillsLoading(true);
+      setSkillsList([]);
+      setSkillBundles([]);
+    }
     try {
       const snapshotAgentId = agentId;
       const [skillsRes, bundlesRes] = await Promise.all([
@@ -72,8 +86,13 @@ export function SkillsTab() {
       if (skillsViewAgentIdRef.current !== snapshotAgentId) return;
       setSkillsList(data.skills || []);
       setSkillBundles(bundleData.bundles || []);
+      skillsListOwnerIdRef.current = snapshotAgentId;
     } catch (err) {
       console.error('[skills] load failed:', err);
+    } finally {
+      if (skillsViewAgentIdRef.current === agentId && ownerChanged) {
+        setSkillsLoading(false);
+      }
     }
   }, []);
 
@@ -528,7 +547,9 @@ export function SkillsTab() {
           }}
         />
 
-        {userSkills.length === 0 && skillBundles.length === 0 ? (
+        {skillsLoading ? (
+          <p className={`${styles['settings-muted-note']} ${styles['skills-empty']}`}>{t('status.loading')}</p>
+        ) : userSkills.length === 0 && skillBundles.length === 0 ? (
           <p className={`${styles['settings-muted-note']} ${styles['skills-empty']}`}>{t('settings.skills.noUser')}</p>
         ) : (
           <SkillBundleTree
@@ -564,7 +585,11 @@ export function SkillsTab() {
           />
         }
       >
-        {userSkills.length === 0 && skillBundles.length === 0 ? (
+        {skillsLoading ? (
+          <p className={styles['agent-skill-empty']} style={{ padding: 'var(--space-md)', margin: 0 }}>
+            {t('status.loading')}
+          </p>
+        ) : userSkills.length === 0 && skillBundles.length === 0 ? (
           <p className={styles['agent-skill-empty']} style={{ padding: 'var(--space-md)', margin: 0 }}>
             {t('settings.skills.noUser')}
           </p>

@@ -75,6 +75,11 @@ export interface SettingsSnapshot {
       readOnly: boolean;
       receiptEnabled: boolean;
     };
+    computerUse?: {
+      selectedProviderId?: string | null;
+      status?: Record<string, any> | null;
+      settings?: Record<string, any>;
+    };
     speechRecognition: Record<string, any>;
     experiments: any[];
   };

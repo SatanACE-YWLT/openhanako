@@ -80,6 +80,30 @@ describe('WorkTab workspace persistence', () => {
     cleanup();
   });
 
+  it('renders the current agent desk settings from settingsConfig on the first paint', async () => {
+    mockState.settingsConfig = {
+      desk: {
+        home_folder: '/snapshot-home',
+        heartbeat_master: true,
+        heartbeat_enabled: false,
+        heartbeat_interval: 23,
+      },
+      workspace_context: {
+        inject_agents_md: true,
+        inject_claude_md: false,
+      },
+    };
+    mockState.settingsSnapshot = { data: { agentId: 'agent-a' } };
+    const { WorkTab } = await import('../../settings/tabs/WorkTab');
+
+    render(<WorkTab />);
+
+    expect(screen.getByDisplayValue('/snapshot-home')).toBeTruthy();
+    expect(screen.getByDisplayValue('23')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'settings.work.injectAgentsMd' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'settings.work.injectClaudeMd' }).getAttribute('aria-checked')).toBe('false');
+  });
+
   it('saves the selected agent workspace without sending frontend business IPC', async () => {
     const { WorkTab } = await import('../../settings/tabs/WorkTab');
 
@@ -132,6 +156,29 @@ describe('WorkTab workspace persistence', () => {
     render(<WorkTab />);
 
     expect(await screen.findByDisplayValue('31')).toBeTruthy();
+  });
+
+  it('treats a missing per-agent heartbeat flag as off after loading the agent config', async () => {
+    mockHanaFetch.mockImplementation((url: string, options?: RequestInit) => {
+      if (url === '/api/agents/agent-a/config' && !options?.method) {
+        return Promise.resolve(jsonResponse({
+          desk: {
+            home_folder: '/old-home',
+            heartbeat_interval: 31,
+          },
+        }));
+      }
+      if (url === '/api/agents/agent-a/config' && options?.method === 'PUT') {
+        return Promise.resolve(jsonResponse({ ok: true }));
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+    const { WorkTab } = await import('../../settings/tabs/WorkTab');
+
+    render(<WorkTab />);
+
+    const interval = await screen.findByDisplayValue('31') as HTMLInputElement;
+    expect(interval.disabled).toBe(true);
   });
 
   it('keeps global work switches loading until settings config is ready', async () => {

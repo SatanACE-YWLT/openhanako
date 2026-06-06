@@ -27,9 +27,37 @@ function normalizeAutomationPermissionMode(value: unknown): BridgePermissionMode
   return value === 'operate' || value === 'read_only' ? value : 'auto';
 }
 
+function deskFromConfig(data: Record<string, any>): AgentDeskConfig {
+  return {
+    home_folder: data.desk?.home_folder || '',
+    heartbeat_enabled: data.desk?.heartbeat_enabled === true,
+    heartbeat_interval: data.desk?.heartbeat_interval ?? DEFAULT_HEARTBEAT_INTERVAL_MINUTES,
+    workspace_context: {
+      inject_agents_md: data.workspace_context?.inject_agents_md === true,
+      inject_claude_md: data.workspace_context?.inject_claude_md === true,
+    },
+  };
+}
+
+function agentDeskFromStoreForAgent(agentId: string | null): AgentDeskConfig | null {
+  if (!agentId) return null;
+  const state = useSettingsStore.getState();
+  const configOwnerId = state.settingsSnapshot?.data?.agentId
+    || state.settingsAgentId
+    || (state.settingsConfigStatus === 'ready' ? state.currentAgentId : null);
+  if (!state.settingsConfig || configOwnerId !== agentId) return null;
+  return deskFromConfig(state.settingsConfig);
+}
+
 export function WorkTab() {
-  const { settingsConfig, currentAgentId } = useSettingsStore(
-    useShallow(s => ({ settingsConfig: s.settingsConfig, currentAgentId: s.currentAgentId }))
+  const { settingsConfig, settingsConfigStatus, currentAgentId, settingsAgentId, settingsSnapshotAgentId } = useSettingsStore(
+    useShallow(s => ({
+      settingsConfig: s.settingsConfig,
+      settingsConfigStatus: s.settingsConfigStatus,
+      currentAgentId: s.currentAgentId,
+      settingsAgentId: s.settingsAgentId,
+      settingsSnapshotAgentId: s.settingsSnapshot?.data?.agentId || null,
+    }))
   );
   const showToast = useSettingsStore(s => s.showToast);
 
@@ -40,22 +68,33 @@ export function WorkTab() {
     : undefined;
 
   // ── Agent selector (作为 section context，表达"当前配置哪个 agent") ──
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(currentAgentId);
+  const initialAgentId = settingsAgentId || currentAgentId;
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(initialAgentId);
   const selectedAgentIdRef = useRef(selectedAgentId);
   selectedAgentIdRef.current = selectedAgentId;
 
   useEffect(() => {
     if (selectedAgentId) return;
-    if (currentAgentId) setSelectedAgentId(currentAgentId);
-  }, [currentAgentId]);
+    const agentId = settingsAgentId || currentAgentId;
+    if (agentId) setSelectedAgentId(agentId);
+  }, [currentAgentId, selectedAgentId, settingsAgentId]);
 
   // ── Per-agent 远程快照：null = 未加载。切 agent 时重置，避免残留上一个 agent 的值 ──
-  const [agentDesk, setAgentDesk] = useState<AgentDeskConfig | null>(null);
+  const [agentDesk, setAgentDesk] = useState<AgentDeskConfig | null>(() => agentDeskFromStoreForAgent(initialAgentId));
   // hbInterval 是 draft：用户编辑后点"保存"才落盘，必须独立于 agentDesk
-  const [hbIntervalDraft, setHbIntervalDraft] = useState<number | null>(null);
+  const [hbIntervalDraft, setHbIntervalDraft] = useState<number | null>(() => agentDeskFromStoreForAgent(initialAgentId)?.heartbeat_interval ?? null);
 
   useEffect(() => {
     if (!selectedAgentId) return;
+    const configOwnerId = settingsSnapshotAgentId
+      || settingsAgentId
+      || (settingsConfigStatus === 'ready' ? currentAgentId : null);
+    if (settingsConfig && configOwnerId === selectedAgentId) {
+      const desk = deskFromConfig(settingsConfig);
+      setAgentDesk(desk);
+      setHbIntervalDraft(desk.heartbeat_interval);
+      return;
+    }
     setAgentDesk(null);
     setHbIntervalDraft(null);
     const ac = new AbortController();
@@ -63,15 +102,7 @@ export function WorkTab() {
       .then(r => r.json())
       .then(data => {
         if (ac.signal.aborted) return;
-        const desk: AgentDeskConfig = {
-          home_folder: data.desk?.home_folder || '',
-          heartbeat_enabled: data.desk?.heartbeat_enabled !== false,
-          heartbeat_interval: data.desk?.heartbeat_interval ?? DEFAULT_HEARTBEAT_INTERVAL_MINUTES,
-          workspace_context: {
-            inject_agents_md: data.workspace_context?.inject_agents_md === true,
-            inject_claude_md: data.workspace_context?.inject_claude_md === true,
-          },
-        };
+        const desk = deskFromConfig(data);
         setAgentDesk(desk);
         setHbIntervalDraft(desk.heartbeat_interval);
       })
@@ -79,7 +110,7 @@ export function WorkTab() {
         if (err?.name !== 'AbortError') console.warn('[work] fetch agent config failed:', err);
       });
     return () => ac.abort();
-  }, [selectedAgentId]);
+  }, [currentAgentId, selectedAgentId, settingsAgentId, settingsConfig, settingsConfigStatus, settingsSnapshotAgentId]);
 
   const toggleHeartbeatMaster = async (on: boolean) => {
     await autoSaveConfig({ desk: { heartbeat_master: on } });

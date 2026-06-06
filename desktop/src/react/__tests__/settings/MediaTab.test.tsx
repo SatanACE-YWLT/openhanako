@@ -100,6 +100,62 @@ describe('MediaTab image-gen config', () => {
     });
   });
 
+  it('keeps default model selectors in loading state until provider configs arrive', async () => {
+    let resolveImageProviders: (response: Response) => void = () => {};
+    let resolveSpeechProviders: (response: Response) => void = () => {};
+    mocks.hanaFetch.mockImplementation((path: string) => {
+      if (path === '/api/plugins/image-gen/providers') {
+        return new Promise(resolve => {
+          resolveImageProviders = resolve;
+        });
+      }
+      if (path === '/api/speech-recognition/providers') {
+        return new Promise(resolve => {
+          resolveSpeechProviders = resolve;
+        });
+      }
+      return Promise.resolve(jsonResponse({ values: {} }));
+    });
+
+    render(<MediaTab />);
+
+    const imageSelect = screen.getByLabelText('settings.media.defaultModel') as HTMLSelectElement;
+    const speechSelect = screen.getByLabelText('语音条转录模型') as HTMLSelectElement;
+    expect(imageSelect.disabled).toBe(true);
+    expect(imageSelect.value).toBe('__loading');
+    expect(speechSelect.disabled).toBe(true);
+    expect(speechSelect.value).toBe('__loading');
+
+    resolveImageProviders(jsonResponse({
+      providers: {
+        volcengine: {
+          providerId: 'volcengine',
+          displayName: 'Volcengine',
+          hasCredentials: true,
+          models: [{ id: 'seedream-5', name: 'Seedream 5.0' }],
+          availableModels: [],
+        },
+      },
+      config: { defaultImageModel: { provider: 'volcengine', id: 'seedream-5' } },
+    }));
+    resolveSpeechProviders(jsonResponse({
+      providers: {
+        openai: {
+          providerId: 'openai',
+          displayName: 'OpenAI Speech',
+          hasCredentials: true,
+          models: [{ id: 'whisper-1', name: 'Whisper 1', adapterAvailable: true }],
+        },
+      },
+      config: { enabled: true, defaultModel: { provider: 'openai', id: 'whisper-1' } },
+    }));
+
+    await waitFor(() => {
+      expect(imageSelect.value).toBe('volcengine/seedream-5');
+      expect(speechSelect.value).toBe('openai/whisper-1');
+    });
+  });
+
   it('loads global image-gen config without agent scope and saves through the generic config envelope', async () => {
     render(<MediaTab />);
 

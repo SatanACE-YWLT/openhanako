@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { createSettingsSnapshotRoute } from "../server/routes/settings-snapshot.ts";
 
@@ -222,5 +222,65 @@ describe("settings snapshot route", () => {
       receiptEnabled: false,
     });
     expect(JSON.stringify(body)).not.toContain("tg-secret");
+  });
+
+  it("includes first-frame Computer Use truth in the unified settings snapshot", async () => {
+    const engine: any = await makeEngine();
+    engine.getComputerUseSettings = vi.fn(() => ({
+      enabled: true,
+      provider_by_platform: { darwin: "macos:cua", win32: "windows:uia", linux: "mock" },
+      allow_windows_input_injection: false,
+      app_approvals: [{
+        providerId: "macos:cua",
+        appId: "com.apple.calculator",
+        appName: "Calculator",
+      }],
+    }));
+    engine.getComputerHost = vi.fn(() => ({
+      getStatus: vi.fn(async () => ({
+        enabled: true,
+        selectedProviderId: "macos:cua",
+        providers: [{
+          providerId: "macos:cua",
+          status: {
+            available: true,
+            permissions: [{ name: "Accessibility", granted: true }],
+          },
+        }],
+        activeLease: null,
+      })),
+    }));
+
+    const app = new Hono();
+    app.route("/api", createSettingsSnapshotRoute(engine, { platform: "darwin" }));
+
+    const res = await app.request("/api/settings/snapshot?agentId=agent-a");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.preferences.computerUse).toMatchObject({
+      selectedProviderId: "macos:cua",
+      settings: {
+        enabled: true,
+        provider_by_platform: { darwin: "macos:cua" },
+        app_approvals: [{
+          providerId: "macos:cua",
+          appId: "com.apple.calculator",
+          appName: "Calculator",
+        }],
+      },
+      status: {
+        enabled: true,
+        selectedProviderId: "macos:cua",
+        providers: [{
+          providerId: "macos:cua",
+          status: {
+            available: true,
+            permissions: [{ name: "Accessibility", granted: true }],
+          },
+        }],
+        activeLease: null,
+      },
+    });
   });
 });

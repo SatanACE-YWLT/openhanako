@@ -172,10 +172,13 @@ export function useBridgeState() {
   // Auto-fetch when selectedAgentId changes (abort stale on switch)
   useEffect(() => {
     if (!selectedAgentId) return;
+    if (settingsSnapshot?.agentId !== selectedAgentId) {
+      applyStatus(null);
+    }
     const ac = new AbortController();
     loadStatus(ac.signal);
     return () => ac.abort();
-  }, [selectedAgentId, loadStatus]);
+  }, [applyStatus, selectedAgentId, loadStatus, settingsSnapshot?.agentId]);
 
   useEffect(() => {
     const handler = () => loadStatus();

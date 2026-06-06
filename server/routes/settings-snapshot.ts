@@ -8,6 +8,7 @@ import { readPinnedMemoryItems } from "../../lib/memory/pinned-memory-store.ts";
 import { listExperienceDocuments } from "../../lib/tools/experience.ts";
 import { createAccessSummary, getLanAddresses } from "./access.ts";
 import { buildBridgeStatus } from "./bridge.ts";
+import { buildComputerUsePreferences } from "./preferences.ts";
 import { normalizeNotificationPreferences } from "../../shared/notification-preferences.ts";
 import { normalizeQuickChatPreferences } from "../../shared/quick-chat-preferences.ts";
 import { normalizeSearchApiKeys, SEARCH_API_PROVIDER_IDS } from "../../shared/search-providers.ts";
@@ -224,6 +225,9 @@ export function createSettingsSnapshotRoute(engine: any, options: Record<string,
           quickChat: engine.getQuickChatPreferences?.() || normalizeQuickChatPreferences({}),
           notifications: engine.getNotificationPreferences?.() || normalizeNotificationPreferences({}),
           bridge: buildBridgePreferences(engine),
+          computerUse: await buildComputerUsePreferences(engine, {
+            platform: options.platform || process.platform,
+          }),
           speechRecognition: engine.speechRecognition?.getConfig?.() || engine.getSpeechRecognitionConfig?.() || { enabled: false },
           experiments: listResolvedExperiments(engine.preferences),
         },
