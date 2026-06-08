@@ -53,8 +53,7 @@ const SDK_BUILTIN_OBJS = [
 ].map(makeTool);
 
 // HanaAgent custom tools — in production these come from agent.tools getter
-// and flow through buildTools.customTools. create_artifact is intentionally
-// absent from fresh sessions; it is a restore-only compatibility tool.
+// and flow through buildTools.customTools.
 const HANAKO_CUSTOM_OBJS = [
   "search_memory", "pin_memory", "unpin_memory", "web_search",
   "web_fetch", "todo_write", "notify",

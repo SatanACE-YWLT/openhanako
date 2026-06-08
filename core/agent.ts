@@ -20,7 +20,6 @@ import { createAutomationTool } from "../lib/tools/automation-tool.ts";
 import { createWebFetchTool } from "../lib/tools/web-fetch.ts";
 import { createStageFilesTool } from "../lib/tools/output-file-tool.ts";
 import { createFileTool } from "../lib/tools/file-tool.ts";
-import { createArtifactTool } from "../lib/tools/artifact-tool.ts";
 import { createChannelTool } from "../lib/tools/channel-tool.ts";
 import { createDmTool } from "../lib/tools/dm-tool.ts";
 import { createBrowserTool } from "../lib/tools/browser-tool.ts";
@@ -90,7 +89,6 @@ type BuildSystemPromptOptions = {
 };
 
 export class Agent {
-  declare _artifactTool: any;
   declare _automationTool: any;
   declare _browserTool: any;
   declare _cb: any;
@@ -224,9 +222,6 @@ export class Agent {
     this._automationTool = null;
     this._stageFilesTool = null;
     this._fileTool = null;
-    // Legacy compatibility only. Fresh sessions should write files and stage
-    // them via stage_files; restored old sessions may still need this schema.
-    this._artifactTool = null;
     this._channelTool = null;
     this._browserTool = null;
     this._computerUseTool = null;
@@ -466,11 +461,6 @@ export class Agent {
       getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
       resolveSessionFile: (fileId, options = {}) => this._cb?.getEngine?.()?.getSessionFile?.(fileId, options) || null,
       registerSessionFile: (entry) => this._cb?.registerSessionFile?.(entry),
-    });
-    this._artifactTool = createArtifactTool({
-      getHanakoHome: () => this._cb?.getEngine?.()?.hanakoHome,
-      registerSessionFile: (entry) => this._cb?.registerSessionFile?.(entry),
-      getSessionPath: () => this._cb?.getCurrentSessionPath?.(),
     });
     this._browserTool = createBrowserTool(() => this._cb?.getCurrentSessionPath?.(), {
       getSessionModel: (sessionPath) => {
@@ -852,9 +842,6 @@ export class Agent {
     const computerUseTools = this._isComputerUseCandidateForThisAgent()
       ? [this._getComputerUseTool()]
       : [];
-    const legacyArtifactTools = options.includeLegacyArtifactTool === true
-      ? [this._artifactTool]
-      : [];
     return [
       ...memTools,
       ...experienceTools,
@@ -864,7 +851,6 @@ export class Agent {
       this._automationTool,
       this._stageFilesTool,
       this._fileTool,
-      ...legacyArtifactTools,
       this._channelTool,
       this._dmTool,
       this._browserTool,

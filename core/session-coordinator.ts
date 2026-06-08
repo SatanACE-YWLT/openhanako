@@ -726,22 +726,6 @@ export class SessionCoordinator {
 
   // ── Session 创建 / 切换 ──
 
-  async _shouldIncludeLegacyArtifactToolForRestore(agent: any, sessionPath: any) {
-    if (!sessionPath) return true;
-    try {
-      const metaPath = path.join(agent.sessionDir, "session-meta.json");
-      const raw = await fsp.readFile(metaPath, "utf-8");
-      const meta = JSON.parse(raw);
-      const metaEntry = meta[path.basename(sessionPath)];
-      if (Array.isArray(metaEntry?.toolNames)) {
-        return metaEntry.toolNames.includes("create_artifact");
-      }
-      return true;
-    } catch (err) {
-      return err.code === "ENOENT";
-    }
-  }
-
   async createSession(sessionMgr: any, cwd: any, memoryEnabled = true, model: any = null, {
     restore = false,
     agent: explicitAgent = null,
@@ -847,10 +831,6 @@ export class SessionCoordinator {
         // session-meta 可选：读取或解析失败时沿用上面 fresh 算出的 workspaceScope。
       }
     }
-    const includeLegacyArtifactTool = restore
-      ? await this._shouldIncludeLegacyArtifactToolForRestore(agent, sessionPathForMeta)
-      : false;
-
     // 冻结当前 session 的有效记忆参与态。
     // fresh create: 以"创建当下实际会进入 prompt 前缀的状态"为准（master && session）
     // restore: 以 session-meta 里冻结下来的 memoryEnabled 为准。
@@ -1038,9 +1018,6 @@ export class SessionCoordinator {
     const toolSnapshotOptions: any = { forceMemoryEnabled: frozenMemoryEnabled, model: effectiveModel };
     if (agentHasExperienceSwitch) {
       toolSnapshotOptions.forceExperienceEnabled = frozenExperienceEnabled;
-    }
-    if (includeLegacyArtifactTool) {
-      toolSnapshotOptions.includeLegacyArtifactTool = true;
     }
     const agentToolsSnapshot = typeof agent.getToolsSnapshot === "function"
       ? agent.getToolsSnapshot(toolSnapshotOptions)
