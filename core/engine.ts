@@ -631,6 +631,7 @@ export class HanaEngine {
   }
   getSessionFile(fileId, options) { return this._sessionFiles.get(fileId, options); }
   getSessionFileByPath(filePath, options) { return this._sessionFiles.getByFilePath(filePath, options); }
+  getSessionFileBySourceKey(sourceKey, options) { return this._sessionFiles.getBySourceKey(sourceKey, options); }
   listSessionFiles(sessionPath) { return this._sessionFiles.list(sessionPath); }
   updateSessionFileTranscription(fileId, transcription, options) { return this._sessionFiles.updateTranscription(fileId, transcription, options); }
   beginCurrentTurnNativeMedia(sessionPath, opts) { return this._currentTurnNativeMedia.begin(sessionPath, opts); }
