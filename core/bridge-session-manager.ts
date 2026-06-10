@@ -712,6 +712,8 @@ export class BridgeSessionManager {
     const raw = { ...context };
     delete raw.platformLabel;
     delete raw.notificationHint;
+    // 派生字段：重建时由 buildBridgeContext 按平台声明表附加，不缓存代码版本化的能力对象
+    delete raw.interactionCapabilities;
     this._sessionPathBridgeContexts.set(path.resolve(sessionPath), raw);
   }
 
