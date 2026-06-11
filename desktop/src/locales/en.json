@@ -371,7 +371,11 @@
       "xhigh": "full reasoning"
     },
     "contextWindow": "Context {windowK}k",
-    "tokensUsed": "Used {tokensK}k ({pct}%)"
+    "tokensUsed": "Used {tokensK}k ({pct}%)",
+    "contextActions": "Context actions",
+    "refreshAndCompact": "Update and compact",
+    "refreshAndCompactTooltip": "Update to the latest memory and tool set",
+    "compact": "Compact"
   },
   "slash": {
     "diary": "Write today's diary",
