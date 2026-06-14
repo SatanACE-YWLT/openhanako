@@ -1972,9 +1972,15 @@ export class SessionCoordinator {
     }
   }
 
-  async abort() {
+  _normalizeAbortReason(options: any, fallback = "abort") {
+    const raw = typeof options === "string" ? options : options?.reason;
+    return typeof raw === "string" && raw.trim() ? raw.trim() : fallback;
+  }
+
+  async abort(options: any = {}) {
+    const reason = this._normalizeAbortReason(options, "abort");
     const sessionPath = this.currentSessionPath;
-    if (sessionPath) return this.abortSession(sessionPath);
+    if (sessionPath) return this.abortSession(sessionPath, { reason });
     if (!this._session?.isStreaming) return false;
 
     try {
@@ -2161,18 +2167,19 @@ export class SessionCoordinator {
     }
   }
 
-  async abortSession(sessionPath: any) {
+  async abortSession(sessionPath: any, options: any = {}) {
+    const reason = this._normalizeAbortReason(options, "abort");
     const pending = this._prePromptAbortControllers.get(sessionPath);
     if (pending) {
       pending.abort();
       this._prePromptAbortControllers.delete(sessionPath);
-      this._cleanupAbortedSessionSidecars(sessionPath, "abort");
+      this._cleanupAbortedSessionSidecars(sessionPath, reason);
       return true;
     }
     const entry = this._sessions.get(sessionPath);
     if (!entry?.session.isStreaming) return false;
-    this._cleanupAbortedSessionSidecars(sessionPath, "abort");
-    return this._forceReleaseStreamingSession(entry, sessionPath, "abort");
+    this._cleanupAbortedSessionSidecars(sessionPath, reason);
+    return this._forceReleaseStreamingSession(entry, sessionPath, reason);
   }
 
   // ── Mid-session model switch ──
@@ -3101,8 +3108,8 @@ export class SessionCoordinator {
     return !!this._sessions.get(sessionPath)?._switching;
   }
 
-  async abortSessionByPath(sessionPath: any) {
-    return this.abortSession(sessionPath);
+  async abortSessionByPath(sessionPath: any, options: any = {}) {
+    return this.abortSession(sessionPath, options);
   }
 
   async listSessions(options: any = {}) {
