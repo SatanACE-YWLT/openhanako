@@ -352,9 +352,13 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
   );
   const modelSwitching = useStore(s => s.modelSwitching);
   const currentSessionItems = useStore(s => s.currentSessionPath ? s.chatSessions[s.currentSessionPath]?.items : undefined);
+  const storedSessionConfirmation = useStore(s => s.currentSessionPath
+    ? s.pendingSessionConfirmationsByPath[s.currentSessionPath] || null
+    : null);
   const pendingSessionConfirmation = useMemo(() => {
-    return findLatestInputSessionConfirmation(currentSessionItems, undefined, true);
-  }, [currentSessionItems]);
+    return findLatestInputSessionConfirmation(currentSessionItems, undefined, true)
+      || storedSessionConfirmation;
+  }, [currentSessionItems, storedSessionConfirmation]);
 
   // Local state
   const permissionMode = useStore(s => s.sessionPermissionMode);

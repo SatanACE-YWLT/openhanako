@@ -323,6 +323,21 @@ function applyVoiceTranscriptionUpdate(msg: any): void {
   if (changed) bumpMessageLiveVersion(sessionPath);
 }
 
+function applyInputSessionConfirmationBlock(msg: any): void {
+  if (msg.type !== 'content_block') return;
+  const block = msg.block;
+  if (block?.type !== 'session_confirmation' || block.surface !== 'input') return;
+  const sessionPath = typeof msg.sessionPath === 'string' ? msg.sessionPath.trim() : '';
+  if (!sessionPath) {
+    console.warn('[ws] input session_confirmation missing sessionPath, skipping pending cache');
+    return;
+  }
+  useStore.getState().setPendingSessionConfirmation?.(
+    sessionPath,
+    block.status === 'pending' ? block : null,
+  );
+}
+
 // ── 消息分发（大 switch） ──
 
 export function handleServerMessage(msg: any): void {
@@ -351,6 +366,8 @@ export function handleServerMessage(msg: any): void {
   if (msg.type === 'compaction_start' || msg.type === 'compaction_end') {
     applyCompactionLifecycle(msg);
   }
+
+  applyInputSessionConfirmationBlock(msg);
 
   // 活跃 block 事件路由：非当前 session 的聊天事件也要写入正常聊天缓存。
   // stream-key-dispatcher 只负责卡片/预览订阅，不能吞掉主 transcript 的后台流。
@@ -831,6 +848,7 @@ export function handleServerMessage(msg: any): void {
 
         return changed ? { chatSessions: nextSessions } : {};
       });
+      useStore.getState().resolvePendingSessionConfirmation?.(msg.confirmId);
       changedPaths = Array.from(new Set(changedPaths));
       for (const sp of changedPaths) bumpMessageLiveVersion(sp);
       break;

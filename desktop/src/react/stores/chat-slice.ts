@@ -502,6 +502,8 @@ export const createChatSlice = (
     delete versions[path];
     const scrollPositions = { ...s.scrollPositions };
     delete scrollPositions[path];
+    const pendingConfirmations = { ...((s as any).pendingSessionConfirmationsByPath || {}) };
+    delete pendingConfirmations[path];
     // FileRef 缓存和 streamBuffer 都绑定 session 生命周期，归属方主动清
     invalidateSessionCache(path);
     invalidateStreamBuffer(path);
@@ -513,7 +515,8 @@ export const createChatSlice = (
       sessionModelsByPath: models,
       _loadMessagesVersion: versions,
       scrollPositions,
-    };
+      pendingSessionConfirmationsByPath: pendingConfirmations,
+    } as any;
   }),
 
   saveScrollPosition: (path, scrollTop) => set((s) => ({

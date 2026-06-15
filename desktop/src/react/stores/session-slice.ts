@@ -1,4 +1,5 @@
 import type { Session, SessionCapabilityDrift, SessionPermissionMode, SessionStream, TodoItem } from '../types';
+import type { SessionConfirmationBlock } from './chat-types';
 import type { ThinkingLevel } from './model-slice';
 
 const SESSION_PERMISSION_MODES = new Set(['auto', 'operate', 'ask', 'read_only']);
@@ -34,6 +35,8 @@ export interface SessionSlice {
   capabilityDriftBySession: Record<string, SessionCapabilityDrift>;
   /** #1624：fresh-compact 刷新进行中的 session 集合（跨切换保留 busy 态） */
   capabilityRefreshingSessions: string[];
+  /** 输入区确认卡片的 live pending 状态，keyed by sessionPath，避免后台 session 事件被焦点过滤丢失。 */
+  pendingSessionConfirmationsByPath: Record<string, SessionConfirmationBlock>;
   setSessions: (sessions: Session[]) => void;
   setCurrentSessionPath: (path: string | null) => void;
   setPendingSessionSwitchPath: (path: string | null) => void;
@@ -51,6 +54,8 @@ export interface SessionSlice {
   bumpTodosLiveVersion: (sessionPath: string) => void;
   setSessionCapabilityDrift: (sessionPath: string, drift: SessionCapabilityDrift | null) => void;
   setSessionCapabilityRefreshing: (sessionPath: string, refreshing: boolean) => void;
+  setPendingSessionConfirmation: (sessionPath: string, block: SessionConfirmationBlock | null) => void;
+  resolvePendingSessionConfirmation: (confirmId: string) => void;
 }
 
 export const createSessionSlice = (
@@ -72,6 +77,7 @@ export const createSessionSlice = (
   todosLiveVersionBySession: {},
   capabilityDriftBySession: {},
   capabilityRefreshingSessions: [],
+  pendingSessionConfirmationsByPath: {},
   setSessions: (sessions) => set({ sessions }),
   setCurrentSessionPath: (path) => set({ currentSessionPath: path }),
   setPendingSessionSwitchPath: (path) => set({ pendingSessionSwitchPath: path }),
@@ -150,4 +156,29 @@ export const createSessionSlice = (
           : [...s.capabilityRefreshingSessions, sessionPath])
         : s.capabilityRefreshingSessions.filter((p) => p !== sessionPath),
     })),
+  setPendingSessionConfirmation: (sessionPath, block) =>
+    set((s) => {
+      const path = typeof sessionPath === 'string' ? sessionPath.trim() : '';
+      if (!path) return {};
+      const next = { ...s.pendingSessionConfirmationsByPath };
+      if (block?.status === 'pending') {
+        next[path] = block;
+      } else {
+        delete next[path];
+      }
+      return { pendingSessionConfirmationsByPath: next };
+    }),
+  resolvePendingSessionConfirmation: (confirmId) =>
+    set((s) => {
+      const id = typeof confirmId === 'string' ? confirmId.trim() : '';
+      if (!id) return {};
+      let changed = false;
+      const next = { ...s.pendingSessionConfirmationsByPath };
+      for (const [sessionPath, block] of Object.entries(next)) {
+        if (block.confirmId !== id) continue;
+        delete next[sessionPath];
+        changed = true;
+      }
+      return changed ? { pendingSessionConfirmationsByPath: next } : {};
+    }),
 });
