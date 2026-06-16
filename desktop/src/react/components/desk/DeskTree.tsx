@@ -153,6 +153,28 @@ function toggleExpanded(paths: string[], subdir: string): string[] {
   return [...paths, subdir];
 }
 
+const BACKGROUND_TREE_REFRESH_DELAY_MS = 120;
+const backgroundTreeRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function deskRootKey(basePath: string, mountId: string | null): string {
+  return mountId ? `studio:${mountId}` : basePath;
+}
+
+function scheduleBackgroundTreeRefresh(subdir: string, rootKey: string): void {
+  if (!rootKey) return;
+  const key = `${rootKey}\n${subdir}`;
+  const existing = backgroundTreeRefreshTimers.get(key);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    backgroundTreeRefreshTimers.delete(key);
+    const state = useStore.getState();
+    if (deskRootKey(state.deskBasePath, state.deskWorkspaceMountId) !== rootKey) return;
+    if (!state.deskExpandedPaths.includes(subdir)) return;
+    void loadDeskTreeFiles(subdir, { force: true });
+  }, BACKGROUND_TREE_REFRESH_DELAY_MS);
+  backgroundTreeRefreshTimers.set(key, timer);
+}
+
 function TreeDisclosureIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -310,7 +332,6 @@ function TreeNode({
   const expanded = file.isDir && expandedPaths.includes(subdir);
   const selected = selectedPaths.has(subdir);
   const children = treeFilesByPath[subdir] || [];
-  const t = window.t ?? ((p: string) => p);
   const [dropTarget, setDropTarget] = useState(false);
   const isRenaming = inlineEdit?.mode === 'rename' && inlineEdit.targetSubdir === subdir;
   const pendingChild = inlineEdit?.mode === 'create' && inlineEdit.parentSubdir === subdir ? inlineEdit : null;
@@ -330,10 +351,15 @@ function TreeNode({
 
   const toggleFolder = useCallback(() => {
     if (!file.isDir) return;
+    const hasCachedChildren = Object.prototype.hasOwnProperty.call(treeFilesByPath, subdir);
+    const rootKey = deskRootKey(deskBasePath, deskWorkspaceMountId);
     setDeskExpandedPaths(toggleExpanded(expandedPaths, subdir));
     schedulePersistCurrentWorkspaceUiState();
-    if (!expanded) void loadDeskTreeFiles(subdir, { force: true });
-  }, [expanded, expandedPaths, file.isDir, setDeskExpandedPaths, subdir]);
+    if (!expanded) {
+      if (hasCachedChildren) scheduleBackgroundTreeRefresh(subdir, rootKey);
+      else void loadDeskTreeFiles(subdir);
+    }
+  }, [deskBasePath, deskWorkspaceMountId, expanded, expandedPaths, file.isDir, setDeskExpandedPaths, subdir, treeFilesByPath]);
 
   const previewFile = useCallback(() => {
     if (file.isDir) return;
@@ -366,6 +392,7 @@ function TreeNode({
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const t = window.t ?? ((p: string, _vars?: Record<string, string | number>) => p);
     if (!selectedPaths.has(subdir)) onSelect(subdir, { multi: false, shift: false });
     const path = fullPath(nativeRootDir || deskBasePath, subdir);
     const actionEntries = getDragEntries(subdir);
@@ -379,9 +406,13 @@ function TreeNode({
           label: t(file.isDir ? 'desk.ctx.open' : 'desk.openWithDefault'),
           action: () => {
             if (file.isDir) {
-              setDeskExpandedPaths(expandedPaths.includes(subdir) ? expandedPaths : [...expandedPaths, subdir]);
+              const hasCachedChildren = Object.prototype.hasOwnProperty.call(treeFilesByPath, subdir);
+              const rootKey = deskRootKey(deskBasePath, deskWorkspaceMountId);
+              const alreadyExpanded = expandedPaths.includes(subdir);
+              setDeskExpandedPaths(alreadyExpanded ? expandedPaths : [...expandedPaths, subdir]);
               schedulePersistCurrentWorkspaceUiState();
-              void loadDeskTreeFiles(subdir, { force: true });
+              if (hasCachedChildren) scheduleBackgroundTreeRefresh(subdir, rootKey);
+              else void loadDeskTreeFiles(subdir);
             } else {
               if (isWebRuntime() || !nativeRootDir) previewFile();
               else window.platform?.openFile?.(path);
@@ -425,7 +456,7 @@ function TreeNode({
         },
       ],
     });
-  }, [deskBasePath, deskWorkspaceMountId, expandedPaths, file.isDir, file.name, getDragEntries, nativeRootDir, onBeginRename, onSelect, onShowMenu, onStartCreate, previewFile, selectedPaths, setDeskExpandedPaths, subdir, t]);
+  }, [deskBasePath, deskWorkspaceMountId, expandedPaths, file.isDir, file.name, getDragEntries, nativeRootDir, onBeginRename, onSelect, onShowMenu, onStartCreate, previewFile, selectedPaths, setDeskExpandedPaths, subdir, treeFilesByPath]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (event.key !== 'Enter' || isRenaming || inlineEdit) return;
@@ -613,7 +644,7 @@ export function DeskTree({
   const expandedPaths = useStore(s => s.deskExpandedPaths);
   const deskSelectedPath = useStore(s => s.deskSelectedPath);
   const setDeskSelectedPath = useStore(s => s.setDeskSelectedPath);
-  const activeTypeFilters = typeFilters || [];
+  const activeTypeFilters = typeFilters;
   const treeRef = useRef<HTMLDivElement | null>(null);
   const localSelectionRef = useRef(false);
   const sortedRootFiles = useMemo(
