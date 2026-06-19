@@ -501,6 +501,71 @@ describe("UniversalMediaManager adapter registration bus contract", () => {
     manager.stop();
   });
 
+  it("passes the registering plugin owner context to adapter submit calls", async () => {
+    const root = makeRoot();
+    roots.push(root);
+    const manager = new UniversalMediaManager({
+      hanakoHome: root,
+      preferences: makePreferences(root),
+      providerRegistry: {
+        getMediaProviders: () => [],
+        resolveMediaModel: () => {
+          throw new Error("not configured");
+        },
+      },
+      registerSessionFile: () => {},
+    });
+    const bus = makeBus();
+    manager.start(bus);
+    const pluginDataDir = path.join(root, "plugin-data", "dreamina");
+    const pluginConfig = { get: vi.fn(() => null) };
+    const pluginLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const submit = vi.fn(async () => ({ taskId: "dreamina-image-task" }));
+
+    const result = bus.handlers.get("media-gen:register-adapter")({
+      adapter: {
+        id: "dreamina",
+        types: ["image"],
+        submit,
+      },
+    }, {
+      caller: {
+        kind: "plugin",
+        pluginId: "dreamina",
+        pluginKey: "community:dreamina",
+        source: "community",
+        pluginDir: path.join(root, "plugins", "dreamina"),
+        dataDir: pluginDataDir,
+        config: pluginConfig,
+        log: pluginLog,
+      },
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(manager.registry.getRecord("dreamina")?.owner).toMatchObject({
+      pluginId: "dreamina",
+      pluginKey: "community:dreamina",
+      dataDir: pluginDataDir,
+    });
+
+    await manager.generateImageFromBus({
+      prompt: "quiet notebook",
+      provider: "dreamina",
+      delivery: { mode: "response" },
+    });
+    await vi.waitFor(() => expect(submit).toHaveBeenCalledOnce());
+    expect((submit as any).mock.calls[0][1]).toMatchObject({
+      pluginId: "dreamina",
+      pluginKey: "community:dreamina",
+      dataDir: pluginDataDir,
+      generatedDir: path.join(pluginDataDir, "generated"),
+      config: pluginConfig,
+      log: pluginLog,
+    });
+
+    manager.stop();
+  });
+
   it("keeps adapter registration independent from logger failures", () => {
     const root = makeRoot();
     roots.push(root);
