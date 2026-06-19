@@ -359,7 +359,9 @@ export class SessionManifestStore {
   createForPath(input) {
     const locator = this._locatorFromPath(input.sessionPath);
     const existing = this._findByLocator(locator.key);
-    if (existing) return existing;
+    if (existing) {
+      return this._repairCurrentLocatorForSameKey(existing, locator, input.locatorReason || "create");
+    }
 
     const createdAt = this._now();
     const memoryPolicy = defaultMemoryPolicy(input.memoryPolicy);
@@ -370,7 +372,9 @@ export class SessionManifestStore {
 
     return this.db.transaction(() => {
       const conflict = this._findByLocator(locator.key);
-      if (conflict) return conflict;
+      if (conflict) {
+        return this._repairCurrentLocatorForSameKey(conflict, locator, input.locatorReason || "create");
+      }
 
       const sessionId = this._generateUniqueSessionId();
       this._stmts.insertManifest.run({
@@ -427,7 +431,7 @@ export class SessionManifestStore {
       }
 
       if (manifest.currentLocator.key === nextLocator.key) {
-        return manifest;
+        return this._repairCurrentLocatorForSameKey(manifest, nextLocator, reason);
       }
 
       this._assertLocatorAvailable(nextLocator.key, sessionId);
@@ -549,8 +553,29 @@ export class SessionManifestStore {
     return {
       type: "jsonl",
       path: locatorPath,
-      key: sessionLocatorKey(locatorPath),
+      key: sessionLocatorKey(sessionPath),
     };
+  }
+
+  _repairCurrentLocatorForSameKey(manifest, locator, reason = "repair") {
+    if (!manifest || manifest.currentLocator?.key !== locator.key) return manifest;
+    if (
+      manifest.currentLocator.path === locator.path
+      && manifest.currentLocator.type === locator.type
+    ) {
+      return manifest;
+    }
+    const updatedAt = this._now();
+    this._stmts.updateLocator.run({
+      sessionId: manifest.sessionId,
+      currentLocatorType: locator.type,
+      currentLocatorPath: locator.path,
+      currentLocatorKey: locator.key,
+      currentLocatorReason: reason,
+      locatorUpdatedAt: updatedAt,
+      updatedAt,
+    });
+    return this.getBySessionId(manifest.sessionId);
   }
 
   _findByLocator(locatorKey) {

@@ -16,6 +16,7 @@ import { hasCompiledMemory, writeCompiledMemorySnapshot } from "../lib/memory/co
 import { t } from "../lib/i18n.ts";
 import { ActivityStore } from "../lib/desk/activity-store.ts";
 import { createHash } from "crypto";
+import { readDirectoryLikeDirentsSync } from "../shared/link-aware-fs.ts";
 import {
   generateAgentId as _generateAgentId,
   generateDescription,
@@ -451,10 +452,9 @@ export class AgentManager {
 
   /** 扫盘读取所有 agent 元数据（I/O 密集，由缓存保护） */
   _scanAgentList() {
-    const entries = fs.readdirSync(this._d.agentsDir, { withFileTypes: true });
+    const entries = readDirectoryLikeDirentsSync(this._d.agentsDir);
     const agents = [];
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
       if (this.isAgentDeleted(entry.name)) continue;
       const configPath = path.join(this._d.agentsDir, entry.name, "config.yaml");
       if (!fs.existsSync(configPath)) continue;
@@ -973,18 +973,16 @@ export class AgentManager {
 
   _scanAgentDirs() {
     try {
-      return fs.readdirSync(this._d.agentsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory()
-          && fs.existsSync(path.join(this._d.agentsDir, e.name, "config.yaml"))
+      return readDirectoryLikeDirentsSync(this._d.agentsDir)
+        .filter(e => fs.existsSync(path.join(this._d.agentsDir, e.name, "config.yaml"))
           && !this.isAgentDeleted(e.name));
     } catch { return []; }
   }
 
   _scanDeletedAgentDirs() {
     try {
-      return fs.readdirSync(this._d.agentsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory()
-          && fs.existsSync(path.join(this._d.agentsDir, e.name, "config.yaml"))
+      return readDirectoryLikeDirentsSync(this._d.agentsDir)
+        .filter(e => fs.existsSync(path.join(this._d.agentsDir, e.name, "config.yaml"))
           && fs.existsSync(this._deletedAgentTombstonePath(e.name)));
     } catch { return []; }
   }
