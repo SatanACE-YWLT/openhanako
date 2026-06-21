@@ -54,9 +54,19 @@ import {
   normalizeSessionThinkingLevel,
   resolveModelDefaultThinkingLevel,
 } from "./session-thinking-level.ts";
-import { repairRestoredToolSnapshot, sameToolNames } from "./tool-snapshot-repair.ts";
+import { sameToolNames } from "./tool-snapshot-repair.ts";
 
 const log = createModuleLogger("bridge-session");
+const BRIDGE_OWNER_DENIED_TOOL_NAMES = Object.freeze([
+  "computer",
+  "hana_card_guide",
+  "show_card",
+]);
+
+function computeBridgeOwnerActiveToolNames(allToolNames) {
+  const denied = new Set(BRIDGE_OWNER_DENIED_TOOL_NAMES);
+  return uniqueToolNames(allToolNames).filter((name) => !denied.has(name));
+}
 
 function assertVideoInputSupported(model, videos) {
   if (!videos?.length) return;
@@ -972,7 +982,6 @@ export class BridgeSessionManager {
         sessionOpts = this._buildOwnerSessionOpts(agent, mm, homeCwd, sessionPathRef, targetModelRef, {
           bridgeContext,
           promptSnapshot,
-          toolNames: entry.toolNames,
         });
       }
       const activeToolNames = this._normalizeToolNames(sessionOpts.activeToolNames);
@@ -1364,7 +1373,6 @@ export class BridgeSessionManager {
       ...(baseTools || []).map((tool) => tool?.name),
       ...(baseCustomTools || []).map((tool) => tool?.name),
     ]);
-    const restoredToolNames = this._normalizeToolNames(opts.toolNames);
 
     return {
       model: ownerModel,
@@ -1376,9 +1384,7 @@ export class BridgeSessionManager {
       tools: baseTools,
       customTools: baseCustomTools,
       settingsManager: this._createSettings(ownerModel),
-      activeToolNames: restoredToolNames.length
-        ? repairRestoredToolSnapshot(restoredToolNames, allToolNames)
-        : allToolNames,
+      activeToolNames: computeBridgeOwnerActiveToolNames(allToolNames),
     };
   }
 
@@ -1454,7 +1460,6 @@ export class BridgeSessionManager {
     const sessionOpts = this._buildOwnerSessionOpts(agent, mm, homeCwd, { current: sessionFilePath }, { current: null }, {
       bridgeContext,
       promptSnapshot,
-      toolNames: entry.toolNames,
     });
     const activeToolNames = this._normalizeToolNames(sessionOpts.activeToolNames);
     delete sessionOpts.activeToolNames;
