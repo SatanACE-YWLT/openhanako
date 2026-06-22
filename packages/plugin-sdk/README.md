@@ -1,6 +1,6 @@
 # @hana/plugin-sdk
 
-Browser-side SDK for Hana iframe plugins.
+Browser-side SDK for Hana WebView/iframe plugins.
 
 ```ts
 import { hana } from '@hana/plugin-sdk';

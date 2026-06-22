@@ -1,6 +1,6 @@
 ---
 name: hana-plugin-creator
-description: Create Hana plugin scaffolds and guide users through beginner or developer plugin planning, capability checks, manifest setup, runtime tools, iframe UI, Session/Agent APIs, model/media APIs, SDK templates, and install-ready plugin directories. Use when HanaAgent/Codex needs to explain what Hana plugins can do, help a user describe a plugin idea, check whether the SDK supports it, or generate/update a Hana plugin with @hana/plugin-runtime, @hana/plugin-sdk, and @hana/plugin-components.
+description: Create Hana plugin scaffolds and guide users through beginner or developer plugin planning, capability checks, manifest setup, runtime tools, WebView/iframe UI, Session/Agent APIs, model/media APIs, SDK templates, and install-ready plugin directories. Use when HanaAgent/Codex needs to explain what Hana plugins can do, help a user describe a plugin idea, check whether the SDK supports it, or generate/update a Hana plugin with @hana/plugin-runtime, @hana/plugin-sdk, and @hana/plugin-components.
 compatibility: "Uses a bundled Node preflight plus a Python scaffold script. No third-party Python packages are required."
 metadata:
   default-enabled: false
@@ -51,7 +51,7 @@ Hana plugins can provide:
 
 Hana provides install/enable/reload, per-agent skill toggles, manifest capability checks, iframe host messaging, theme tokens, toast/clipboard/external host APIs, EventBus, data directories, and SDK packages.
 
-Current boundaries: WebView/iframe UI is the stable escape hatch for existing web apps, remote sites, and standalone HTML. `chat.surface` is a thin native transcript surface for plugin-owned `plugin_private` / `private` sessions created through the runtime session API. Native renderer components, rich native card composition, and code sandboxing are not the default path yet. Ordinary manifest `capabilities` are declaration metadata and can be used directly through the SDK/EventBus; `sensitiveCapabilities` records future user-granted permission intent. If a request depends on native renderer hooks, code sandboxing, or fine-grained permission prompts, explain the gap and propose the closest supported shape.
+Current boundaries: WebView/iframe UI is the stable escape hatch for existing web apps, remote sites, and standalone HTML. `chat.surface` is a thin native transcript surface for plugin-owned `plugin_private` / `private` sessions created through the runtime session API. Rich native card composition belongs to the future Infinity Chalkboard / Card Kernel layer; do not describe it with legacy internal naming. Native renderer components and code sandboxing are not the default path yet. Ordinary manifest `capabilities` are declaration metadata and can be used directly through the SDK/EventBus; `sensitiveCapabilities` records future user-granted permission intent. If a request depends on native renderer hooks, code sandboxing, or fine-grained permission prompts, explain the gap and propose the closest supported shape.
 
 ## Environment Preflight
 
@@ -79,8 +79,8 @@ Behavior:
    - `professional-react`: React/Vite/SDK starter for developers who expect package scripts and typed UI code.
 4. Pick the contribution kind:
    - `tool`: restricted plugin with `tools/*.js`.
-   - `ui`: full-access iframe page/widget.
-   - `full`: tool, lifecycle/EventBus entry, and iframe UI.
+   - `ui`: full-access WebView/iframe page/widget.
+   - `full`: tool, lifecycle/EventBus entry, and WebView/iframe UI.
    - `provider`: full-access provider declaration under `providers/*.js`.
 5. Pick the target location:
    - Built-in plugin shipped with Hana: `plugins/<plugin-id>`.
@@ -123,8 +123,8 @@ python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "My Plugin"
 Useful options:
 
 - `--kind tool`: restricted plugin with a static `tools/create-note.js`.
-- `--kind ui`: full-access plugin with `page` and `widget` iframe UI.
-- `--kind full`: tool, lifecycle/EventBus entry, and iframe UI.
+- `--kind ui`: full-access plugin with `page` and `widget` WebView/iframe UI.
+- `--kind full`: tool, lifecycle/EventBus entry, and WebView/iframe UI.
 - `--kind provider`: full-access provider contribution with a media-capability provider declaration.
 - `--sdk-mode workspace`: use repo-local SDK packages.
 - `--sdk-mode bundled`: copy SDK tarballs from this skill into the generated plugin.
@@ -166,14 +166,14 @@ python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "Jimeng Pro
 - Use `generateImage()` / `generateMedia()` for host media generation instead of calling provider internals directly. The media task pipeline owns progress, cancellation, delivery, and `SessionFile` registration. Image references should use `{ kind: "session_file", fileId }` instead of raw local paths. Provider models must declare reference-image support on each mode with `modes[].inputLimits.referenceImages`, such as `{ min: 0, max: 0 }` for text-only generation or `{ min: 1, max: 1 }` for a single-reference mode. Use `transcribeAudio()` for ASR over registered `SessionFile` audio.
 - Do not call legacy `media-gen:*` events from newly generated plugins. They remain only for old adapter compatibility. New provider plugins must declare `providers/*.js` with `capabilities.media.*`, then use stable media helpers or the formal Adapter Plugin API once available.
 - Local files returned to users must go through `toolCtx.stageFile({ sessionId, sessionRef, filePath, label })`, then media details. `sessionPath` is legacy locator metadata only, not identity. Do not hand-build local `MEDIA:` or `file://` output.
-- Page and widget contributions require `"trust": "full-access"` and route-backed WebView/iframe UI. WebView/iframe cards remain valid for plugin web UI; native `chat.surface` cards are only for plugin-owned private session transcripts.
+- Page and widget contributions require `"trust": "full-access"` and route-backed WebView/iframe UI. WebView/iframe cards remain valid for plugin web UI; native `chat.surface` cards are only for plugin-owned private session transcripts. Future native card APIs should use Infinity Chalkboard / Card Kernel naming, not legacy internal naming.
 - Iframe browser code must call this plugin's own route handlers with `hana.api.fetch('route/path', init)` or `hana.api.url('route/path')`. Do not hard-code `/api/plugins/{pluginId}/...` in browser code, do not reuse `pluginIframeTicket` for XHR/fetch, and do not ask authors to manually pass `pluginSurfaceSession` unless documenting the low-level protocol.
 - `pluginIframeTicket` is only for iframe document loading. Do not append it to CSS, JS, image, font, video, or XHR URLs.
 - Pi SDK extension factories under `extensions/*.js` require `"trust": "full-access"`. They are for provider request rewriting, context filtering, and tool-call observation; use ordinary `tools/*.js` for Agent-callable actions.
 - After full-access plugin install, enable, or reload, Hana rebinds extension runners for idle sessions. Busy sessions pick up the change on the next safe rebuild, so do not promise that an in-flight reply will use freshly edited extension code.
 - Declare only the iframe host capabilities actually used.
 - EventBus handlers should return `HANA_BUS_SKIP` for payloads that do not belong to them.
-- Keep iframe UI self-contained. Do not import renderer internals from `desktop/src/react`.
+- Keep WebView/iframe UI self-contained. Do not import renderer internals from `desktop/src/react`.
 - Provider declarations live in `providers/*.js` and require `"trust": "full-access"`.
 - Keep `capabilities.chat` separate from `capabilities.media.*`. Media-only providers must set `chat.projection = "none"` so they never appear in chat model selectors.
 - CLI-backed providers must declare `runtime.kind = "local-cli"` or `"browser-cli"` with structured arg bindings and output contracts. Do not build shell command strings.
@@ -207,5 +207,5 @@ python3 skills2set/hana-plugin-creator/scripts/create_hana_plugin.py "Jimeng Pro
 - Live data APIs belong behind plugin routes that call `ctx.network.fetch()`. The browser page calls `hana.api.fetch('api/...')`, receives sanitized JSON, and renders it locally.
 - First paint must not auto-call LLM APIs. Trigger model calls only from an explicit user action, then call a plugin backend route with `hana.api.fetch(...)`; the backend route may use `sampleText()` or other runtime helpers.
 - After generating or editing a UI plugin, check for disallowed patterns before installing: `pluginIframeTicket` in asset/API URLs, hard-coded `/api/plugins/{pluginId}` in browser code, direct third-party `fetch()` from iframe assets, custom static-file routes in new code, missing `assets/` files, and page-load LLM calls.
-- If the user asks to turn a login-backed or browser-operated website into a plugin, explain that the stable API today is iframe UI plus route-backed data APIs. Do not create ad hoc browser-control interfaces; note that a future web-session capability should own persistent cookies, navigation, and user-mediated external site interaction.
+- If the user asks to turn a login-backed or browser-operated website into a plugin, explain that the stable API today is WebView/iframe UI plus route-backed data APIs. Do not create ad hoc browser-control interfaces; note that a future web-session capability should own persistent cookies, navigation, and user-mediated external site interaction.
 - Use the dev loop first. Install source into `${HANA_HOME}/plugins-dev/`, reload after edits, run diagnostics and scenarios, then package or install into the normal plugin directory only after the dev copy works. Existing installed plugins may include compatibility handlers; treat them as cleanup candidates, not broken plugins.

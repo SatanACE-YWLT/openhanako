@@ -4,10 +4,10 @@ Hana's plugin SDK is split into small packages so plugin authors can choose only
 
 | Package | Runs In | Purpose |
 | --- | --- | --- |
-| `@hana/plugin-protocol` | iframe / host | Shared protocol constants and message shapes for plugin UI. |
-| `@hana/plugin-sdk` | iframe browser code | Typed helpers for `ready`, asset URLs, resize, toast, external links, clipboard, and lower-level host requests. |
+| `@hana/plugin-protocol` | WebView/iframe / host | Shared protocol constants and message shapes for plugin UI. |
+| `@hana/plugin-sdk` | WebView/iframe browser code | Typed helpers for `ready`, asset URLs, resize, toast, external links, clipboard, and lower-level host requests. |
 | `@hana/plugin-runtime` | plugin Node runtime | Helpers for tools, lifecycle plugins, EventBus handlers, SessionFile media details, providers, and Pi SDK extensions. |
-| `@hana/plugin-components` | iframe React UI | Hana-styled React primitives with theme fallback: controls, cards, rows, lists, and empty states. |
+| `@hana/plugin-components` | WebView/iframe React UI | Hana-styled React primitives with theme fallback: controls, cards, rows, lists, and empty states. |
 
 For the end-to-end plugin author workflow, read `.docs/PLUGIN-DEVELOPMENT.md` first, then use this file as the SDK package map.
 
@@ -19,11 +19,11 @@ npm run build:packages
 
 ## Runtime Boundary
 
-The SDK packages are developer-facing source/build dependencies. The app package still excludes `packages/**`, so plugin UI code should bundle `@hana/plugin-sdk` and `@hana/plugin-components` into its iframe assets. Runtime helpers from `@hana/plugin-runtime` should be bundled or installed with the plugin when the plugin is distributed outside the monorepo.
+The SDK packages are developer-facing source/build dependencies. The app package still excludes `packages/**`, so plugin UI code should bundle `@hana/plugin-sdk` and `@hana/plugin-components` into its WebView/iframe assets. Runtime helpers from `@hana/plugin-runtime` should be bundled or installed with the plugin when the plugin is distributed outside the monorepo.
 
 Built-in plugins may use the same source patterns, but they should be checked against the packaged server bundle before release. The host does not silently provide these SDK packages as global runtime modules.
 
-Plugin server code is installed and loaded by the Studio server. Plugin iframe assets are also served by that server; the desktop renderer, Mobile PWA, or browser client may cache them, but client locality must not decide whether a plugin surface, provider, task, config, or tool exists. Declare true client-machine-only actions separately from server workspace actions.
+Plugin server code is installed and loaded by the Studio server. Plugin WebView/iframe assets are also served by that server; the desktop renderer, Mobile PWA, or browser client may cache them, but client locality must not decide whether a plugin surface, provider, task, config, or tool exists. Declare true client-machine-only actions separately from server workspace actions.
 
 ## Production Install Checklist
 
@@ -52,7 +52,7 @@ The production smoke test is: install the exact folder or zip that users will re
 
 - Tool-only plugins can stay `restricted`. No-build tools may export the static tool contract directly; tools that import `@hana/plugin-runtime` must still satisfy the production install checklist above.
 - Runtime plugins use `index.js` for lifecycle, EventBus handlers, background tasks, schedules, or dynamic tools. They require `trust: "full-access"`.
-- UI plugins use WebView/iframe routes plus `@hana/plugin-sdk` and, for React UI, `@hana/plugin-components`. They require `trust: "full-access"` and explicit `ui.hostCapabilities` grants for host calls such as `external.open`, `clipboard.writeText`, `resource.open`, `resource.pick`, or `resource.requestAccess`. Native `chat.surface` cards are declarative transcript surfaces for plugin-owned private sessions and use `createChatSurfaceCard()`.
+- UI plugins use WebView/iframe routes plus `@hana/plugin-sdk` and, for React UI, `@hana/plugin-components`. They require `trust: "full-access"` and explicit `ui.hostCapabilities` grants for host calls such as `external.open`, `clipboard.writeText`, `resource.open`, `resource.pick`, or `resource.requestAccess`. Native `chat.surface` cards are declarative transcript surfaces for plugin-owned private sessions and use `createChatSurfaceCard()`. Future rich native cards belong to Infinity Chalkboard / Card Kernel, not a separate SDK under the old internal name.
 - Provider contribution plugins use `providers/*.js` declarations. They require `trust: "full-access"` and should declare `capabilities.chat` separately from `capabilities.media.*` so chat selectors stay clean while image, video, or speech tools discover media providers. Provider declarations, `listMediaProviders()`, and `resolveMediaModel()` are the stable discovery entrypoints; media adapter / executor authoring remains a separate API surface. Legacy `media-gen:*` adapter/runtime events remain compatibility-only for older image generation plugins.
 - Pi SDK extension plugins use `extensions/*.js` factories. They require `trust: "full-access"` because they run inside the LLM request pipeline. Hana reloads idle sessions after full-access plugin install/enable/reload so existing chats can pick up new extension handlers without requiring an app restart; busy sessions are not reloaded and will retain old extension handlers until the session is naturally rebuilt.
 - Marketplace metadata lives outside the app repo in `OH-Plugins`, the official community plugin catalog. The app reads the generated catalog URL by default, installs `distribution.kind = "release"` entries by downloading the zip package and verifying `sha256`, and keeps `distribution.kind = "source"` for local file marketplace development only. `versions[]` lets the catalog keep multiple SemVer releases; Hana selects the highest app-compatible version, blocks implicit downgrades, backs up old installs, and records successful installs in `${HANA_HOME}/plugin-installs.json`. `readmePath` is resolved relative to the catalog when the official URL is used.
@@ -123,7 +123,7 @@ Keep source files, secrets, config, and private data outside `assets/`. The host
 
 Agent-generated plugins and scaffold updates should not create custom routes only to serve static resources such as CSS, JS, images, fonts, or MP4 files. Existing plugins that already use static-file compatibility handlers remain loadable. The documented contract for new work is to put those resources in `assets/` and reference them through `hana.assets.url(...)` or the same host-served assets path in the route shell. Treat `pluginIframeTicket` as a document-load credential only; do not manually append it to asset URLs.
 
-Use `@hana/plugin-components` for iframe UI:
+Use `@hana/plugin-components` for WebView/iframe UI:
 
 ```tsx
 import { Button, CardShell, HanaThemeProvider } from '@hana/plugin-components';
@@ -326,7 +326,7 @@ return {
 };
 ```
 
-`createChatSurfaceCard()` requires `sessionId` / `sessionRef`; path-only locators are rejected. Hana resolves the current session path from the manifest and only renders sessions owned by the same plugin with `visibility: 'plugin_private'` or `'private'`. In main this is a thin native transcript surface. Rich composer and native card composition belong to the Workbench plugin SDK layer.
+`createChatSurfaceCard()` requires `sessionId` / `sessionRef`; path-only locators are rejected. Hana resolves the current session path from the manifest and only renders sessions owned by the same plugin with `visibility: 'plugin_private'` or `'private'`. In main this is a thin native transcript surface. Rich composer and native card composition belong to the Infinity Chalkboard / Card Kernel layer.
 
 ### Runtime Model and Media API
 

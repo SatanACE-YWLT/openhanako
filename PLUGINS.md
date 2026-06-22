@@ -39,7 +39,7 @@ export async function execute(input) {
 |------|----------|------|
 | Tool-only | 没有 UI，只给 Agent 增加工具能力 | `restricted` |
 | Runtime | 需要生命周期、EventBus、后台任务、动态工具 | `full-access` |
-| UI | 需要 page / widget / iframe card | `full-access` |
+| UI | 需要 page / widget / WebView/iframe card / `chat.surface` | `full-access` |
 | Marketplace entry | 让插件出现在插件市场 | 写入 `OH-Plugins/plugins/<id>.yaml` |
 
 推荐先用 `hana-plugin-creator` 脚手架生成，再按需求删减：
@@ -338,6 +338,8 @@ route.get("/live-scores", async (c) => {
 - `type: "iframe"` / `type: "webview"`：用于插件自己的 Web UI、远程网站、单独 HTML 或复杂浏览器 UI。旧 `iframe` 卡继续兼容；新文档把它定位成正式 WebView escape hatch。
 - `type: "chat.surface"`：用于把插件自己创建的 `plugin_private` / `private` session 作为原生聊天 transcript 嵌进当前聊天流。它只接受 `sessionId/sessionRef`，宿主会校验该 session 属于当前 plugin 且不是公开 session。
 
+命名边界：未来可组合 native cards 属于 Infinity Chalkboard / Card Kernel。`workbench` 是旧代码 namespace，不作为新插件作者需要学习的公开概念。详见 `.docs/INFINITY-CHALKBOARD.md`。
+
 WebView 卡片示例：
 
 ```js
@@ -345,7 +347,7 @@ return {
   content: [{ type: "text", text: "数据摘要..." }],
   details: {
     card: {
-      type: "iframe",
+      type: "webview",
       route: "/card/chart?symbol=sh600519&period=daily",
       title: "贵州茅台 日K",
       description: "贵州茅台 现价1450.00 涨跌+2.11%",
@@ -385,7 +387,7 @@ return {
 };
 ```
 
-`chat.surface` 在 main 当前版本是薄兼容层，只提供原生 transcript 展示；复杂 composer、可组合 native cards 和组件生态会由 Workbench 插件 SDK 继续扩展。
+`chat.surface` 在 main 当前版本是薄兼容层，只提供原生 transcript 展示；复杂 composer、可组合 native cards 和组件生态会由 Infinity Chalkboard / Card Kernel 继续扩展。
 
 ### Skills（知识注入）
 
@@ -676,7 +678,7 @@ const value = await ctx.config.get("agentMode", { scope: "per-agent", agentId: "
 - 悬停 tab 时显示插件全名（tooltip）
 - Tab 超过 5 个时自动折叠到 overflow 下拉菜单，用户可拖拽排序
 
-插件页面通过 iframe/WebView 渲染。旧 iframe 是兼容名称，新的插件设计可以把它理解成 WebView：适合展示已有 Web 应用、远程网站或单独 HTML。Hana 原生聊天 surface 和未来 Workbench native cards 不依赖 iframe/WebView。新插件建议使用 `@hana/plugin-sdk` 发送握手和宿主请求：
+插件页面通过 WebView/iframe 渲染。旧 iframe 是兼容名称，新的插件设计可以把它理解成 WebView：适合展示已有 Web 应用、远程网站或单独 HTML。Hana 原生聊天 surface 和未来 Infinity Chalkboard native cards 不依赖 WebView/iframe。新插件建议使用 `@hana/plugin-sdk` 发送握手和宿主请求：
 
 ```js
 import { hana } from '@hana/plugin-sdk';
@@ -831,7 +833,7 @@ Widget 同样通过 iframe 渲染，需要发送 `ready` 握手信号。
 大多数 plugin 不需要 manifest。只有以下场景需要：
 
 - 声明 `trust: "full-access"` 获取完整权限
-- 声明 iframe UI 需要的宿主能力（`ui.hostCapabilities`）
+- 声明 WebView/iframe UI 需要的宿主能力（`ui.hostCapabilities`）
 - 声明插件希望使用的普通能力（`capabilities`）或未来需要用户授权的敏感能力（`sensitiveCapabilities`）
 - 声明外部 HTTP 数据访问边界（`network.allowedHosts`、`network.methods` 等）
 - Configuration schema（JSON Schema 声明）
@@ -1313,7 +1315,7 @@ https://raw.githubusercontent.com/liliMozi/OH-Plugins/main/marketplace.json
 
 ## 前向兼容
 
-系统忽略不认识的目录和 manifest 字段。老 plugin 永远能跑在新系统上，新 plugin 在老系统上只是新贡献类型不生效。`manifestVersion` 仍是可选兼容字段；新 iframe UI 若要声明 `ui.hostCapabilities`，建议写 `manifestVersion: 1` 让宿主和 SDK 文档语义对齐，但旧插件不需要补迁移。已有插件中为了兼容早期资源限制而自建的静态资源 route 继续允许；诊断和 Agent 规则只把它们标记为“可整理项”，不会作为加载失败理由。
+系统忽略不认识的目录和 manifest 字段。老 plugin 永远能跑在新系统上，新 plugin 在老系统上只是新贡献类型不生效。`manifestVersion` 仍是可选兼容字段；新 WebView/iframe UI 若要声明 `ui.hostCapabilities`，建议写 `manifestVersion: 1` 让宿主和 SDK 文档语义对齐，但旧插件不需要补迁移。已有插件中为了兼容早期资源限制而自建的静态资源 route 继续允许；诊断和 Agent 规则只把它们标记为“可整理项”，不会作为加载失败理由。
 
 ## 错误隔离
 
