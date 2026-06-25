@@ -468,7 +468,7 @@
     max-width: min(72%, 520px);
     overflow: hidden;
     color: inherit;
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     line-height: 1.45;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -585,7 +585,7 @@
     gap: 3px;
     min-width: 0;
     color: var(--text-muted);
-    font-size: 0.68rem;
+    font-size: var(--fs-hint);
 }
 
 .cronConfirmField input,
@@ -755,7 +755,7 @@
     gap: 3px;
     min-width: 0;
     color: var(--text-muted);
-    font-size: 0.66rem;
+    font-size: var(--fs-hint);
 }
 
 .automationDraftAgentSelect {
@@ -777,7 +777,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     line-height: 1;
     text-align: left;
     cursor: default;
@@ -1080,7 +1080,7 @@
 .settingsUpdateStatus {
     flex: 0 0 auto;
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     text-transform: uppercase;
     letter-spacing: 0;
 }
@@ -1170,7 +1170,7 @@
 }
 
 .toolGroupArrow {
-    font-size: 0.7rem;
+    font-size: var(--fs-hint);
     color: var(--text-muted);
     width: 0.8em;
     flex-shrink: 0;
@@ -1315,7 +1315,7 @@
 .toolDetail {
     flex: 1;
     min-width: 0;
-    font-size: 0.7rem;
+    font-size: var(--fs-hint);
     color: var(--text-muted);
     font-family: var(--font-mono);
     overflow: hidden;
@@ -1338,7 +1338,7 @@
     flex: 0 1 auto;
     min-width: 0;
     max-width: 9rem;
-    font-size: 0.68rem;
+    font-size: var(--fs-hint);
     color: var(--text-muted);
     background: var(--overlay-subtle);
     padding: 0.1rem 0.4rem;
@@ -1501,7 +1501,7 @@
     color: var(--text);
     border: 0;
     font: inherit;
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     text-align: left;
     text-decoration: none;
     white-space: nowrap;
@@ -1579,7 +1579,7 @@
 .mediaGenerationPrompt {
     margin-top: 0.22rem;
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     line-height: 1.35;
     white-space: nowrap;
     overflow: hidden;
@@ -1594,7 +1594,7 @@
     border: 0.5px solid var(--border);
     border-radius: var(--radius-sm);
     font: inherit;
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     line-height: 1.2;
     cursor: default;
     transition:
@@ -1749,7 +1749,7 @@
 .legacyArtifactExpiredBadge {
     flex-shrink: 0;
     margin-left: var(--space-xs);
-    font-size: 0.68rem;
+    font-size: var(--fs-hint);
     color: var(--text-muted);
 }
 
@@ -1782,7 +1782,7 @@
 }
 
 .legacyArtifactCardType {
-    font-size: 0.72rem;
+    font-size: var(--fs-hint);
     color: var(--text-muted);
 }
 
@@ -2022,7 +2022,7 @@
 }
 
 .subagentPreviewTranscript .avatarName {
-    font-size: 0.68rem;
+    font-size: var(--fs-hint);
 }
 
 .subagentPreviewTranscript .message {
