@@ -71,12 +71,10 @@ function toggleLinePrefix(view: EditorView, prefix: string, exclusive?: string[]
       changes.push({ from: line.from, to: line.from + prefix.length, insert: '' });
       if (lineNum === startLine.number) selShift = -prefix.length;
     } else {
-      let stripped = text;
       let stripLen = 0;
       if (exclusive) {
         for (const ex of exclusive) {
           if (text.startsWith(ex)) {
-            stripped = text.slice(ex.length);
             stripLen = ex.length;
             break;
           }
