@@ -230,9 +230,6 @@ export function EditorContextMenu({ editorRef, containerRef }: Props) {
         <FmtButton title={t('ctx.inlineCode')} onClick={() => { close(); const v = getView(); if (v) toggleInlineCode(v); }}>
           <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>
         </FmtButton>
-
-        <div className="context-menu-fmt-sep" />
-
         <FmtButton title={t('ctx.heading1')} onClick={() => { close(); const v = getView(); if (v) setHeading(v, 1); }}>
           <span className="context-menu-fmt-text" style={{ fontSize: '0.8em', fontWeight: 600 }}>H<sub>1</sub></span>
         </FmtButton>
@@ -242,14 +239,13 @@ export function EditorContextMenu({ editorRef, containerRef }: Props) {
         <FmtButton title={t('ctx.heading3')} onClick={() => { close(); const v = getView(); if (v) setHeading(v, 3); }}>
           <span className="context-menu-fmt-text" style={{ fontSize: '0.7em', fontWeight: 500 }}>H<sub>3</sub></span>
         </FmtButton>
-
-        <div className="context-menu-fmt-sep" />
-
+      </div>
+      <div className="context-menu-fmt-row">
         <FmtButton title={t('ctx.blockquote')} onClick={() => { close(); const v = getView(); if (v) toggleBlockquote(v); }}>
-          <svg viewBox="0 0 24 24">
-            <line x1="3" y1="10" x2="21" y2="10" />
-            <line x1="7" y1="6" x2="7" y2="14" />
-            <line x1="3" y1="14" x2="21" y2="14" />
+          <svg viewBox="0 0 24 24" style={{ fill: 'currentColor', stroke: 'none' }}>
+            <path fillRule="evenodd" clipRule="evenodd" d="M20 5H4V19H20V5ZM4 3C2.89543 3 2 3.89543 2 5V19C2 20.1046 2.89543 21 4 21H20C21.1046 21 22 20.1046 22 19V5C22 3.89543 21.1046 3 20 3H4Z" />
+            <path d="M9.06723 9.19629H12.0672L9.93267 14.8038H6.93267L9.06723 9.19629Z" />
+            <path d="M14.0672 9.19629H17.0672L14.9327 14.8038H11.9327L14.0672 9.19629Z" />
           </svg>
         </FmtButton>
         <FmtButton title={t('ctx.codeBlock')} onClick={() => { close(); const v = getView(); if (v) insertCodeBlock(v); }}>
