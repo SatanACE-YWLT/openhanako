@@ -61,6 +61,25 @@ describe("Jimeng CLI command resolution", () => {
     ]));
   });
 
+  it("uses target platform path rules instead of the host OS", () => {
+    const command = resolveDreaminaCommand({
+      env: { PATH: "C:\\Dreamina;D:\\Tools" },
+      exists: (filePath: string) => filePath === "D:\\Tools\\dreamina.exe",
+      homeDir: "C:\\Users\\hana",
+      platform: "win32",
+    });
+
+    expect(command).toBe("D:\\Tools\\dreamina.exe");
+    expect(dreaminaCandidatePaths({
+      env: { LOCALAPPDATA: "C:\\Users\\hana\\AppData\\Local" },
+      homeDir: "C:\\Users\\hana",
+      platform: "win32",
+    })).toEqual(expect.arrayContaining([
+      "C:\\Users\\hana\\bin\\dreamina.exe",
+      "C:\\Users\\hana\\AppData\\Local\\Programs\\dreamina\\dreamina.exe",
+    ]));
+  });
+
   it("returns null when dreamina is not installed", () => {
     expect(resolveDreaminaCommand({
       env: { PATH: "/usr/bin" },

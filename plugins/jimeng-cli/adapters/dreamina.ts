@@ -39,8 +39,20 @@ function executableName(platform = process.platform) {
   return platform === "win32" ? "dreamina.exe" : "dreamina";
 }
 
-function pathEntries(envPath = "") {
-  return String(envPath || "").split(path.delimiter).filter(Boolean);
+function pathApiForPlatform(platform = process.platform) {
+  return platform === "win32" ? path.win32 : path.posix;
+}
+
+function pathDelimiterForPlatform(platform = process.platform) {
+  return platform === "win32" ? ";" : ":";
+}
+
+function joinForPlatform(platform, ...segments) {
+  return pathApiForPlatform(platform).join(...segments);
+}
+
+function pathEntries(envPath = "", platform = process.platform) {
+  return String(envPath || "").split(pathDelimiterForPlatform(platform)).filter(Boolean);
 }
 
 function pushUnique(items, value) {
@@ -50,9 +62,9 @@ function pushUnique(items, value) {
   items.push(trimmed);
 }
 
-function defaultWhich(command, envPath = process.env.PATH || "", exists = fs.existsSync) {
-  for (const dir of pathEntries(envPath)) {
-    const candidate = path.join(dir, command);
+function defaultWhich(command, envPath = process.env.PATH || "", exists = fs.existsSync, platform = process.platform) {
+  for (const dir of pathEntries(envPath, platform)) {
+    const candidate = joinForPlatform(platform, dir, command);
     if (exists(candidate)) return candidate;
   }
   return null;
@@ -68,11 +80,11 @@ export function dreaminaCandidateDirs({
   pushUnique(dirs, env.DREAMINA_CLI_INSTALL_DIR);
 
   if (platform === "win32") {
-    pushUnique(dirs, path.join(homeDir, "bin"));
-    pushUnique(dirs, env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, "Programs", "dreamina") : "");
+    pushUnique(dirs, joinForPlatform(platform, homeDir, "bin"));
+    pushUnique(dirs, env.LOCALAPPDATA ? joinForPlatform(platform, env.LOCALAPPDATA, "Programs", "dreamina") : "");
   } else {
-    pushUnique(dirs, path.join(homeDir, ".local", "bin"));
-    pushUnique(dirs, path.join(homeDir, "bin"));
+    pushUnique(dirs, joinForPlatform(platform, homeDir, ".local", "bin"));
+    pushUnique(dirs, joinForPlatform(platform, homeDir, "bin"));
     pushUnique(dirs, "/usr/local/bin");
     if (platform === "darwin") pushUnique(dirs, "/opt/homebrew/bin");
   }
@@ -81,25 +93,27 @@ export function dreaminaCandidateDirs({
 
 export function dreaminaCandidatePaths(options: any = {}) {
   const command = executableName(options.platform || process.platform);
-  return dreaminaCandidateDirs(options).map((dir) => path.join(dir, command));
+  const platform = options.platform || process.platform;
+  return dreaminaCandidateDirs(options).map((dir) => joinForPlatform(platform, dir, command));
 }
 
 export function resolveDreaminaCommand({
   env = process.env,
   exists = fs.existsSync,
-  which = (command, searchPath) => defaultWhich(command, searchPath, exists),
+  which,
   homeDir = os.homedir(),
   platform = process.platform,
 }: any = {}) {
   const explicit = typeof env.DREAMINA_CLI_PATH === "string" ? env.DREAMINA_CLI_PATH.trim() : "";
   const command = executableName(platform);
+  const resolveWhich = which || ((candidateCommand, searchPath) => defaultWhich(candidateCommand, searchPath, exists, platform));
   if (explicit) {
-    const explicitCommand = path.join(explicit, command);
+    const explicitCommand = joinForPlatform(platform, explicit, command);
     if (exists(explicitCommand)) return explicitCommand;
     if (exists(explicit)) return explicit;
   }
 
-  const fromPath = which(command, env.PATH || "");
+  const fromPath = resolveWhich(command, env.PATH || "");
   if (fromPath) return fromPath;
 
   for (const candidate of dreaminaCandidatePaths({ env, homeDir, platform })) {
