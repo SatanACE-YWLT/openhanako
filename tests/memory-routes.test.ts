@@ -216,4 +216,193 @@ describe("memory routes", () => {
     expect(memoryMd).toContain("## 今天\n\ntoday part");
     expect(engine.updateConfig).toHaveBeenCalledWith({}, { agentId: "hana" });
   });
+
+  it("saves edited today straight to today.md and rebuilds compiled memory", async () => {
+    const agent = makeAgent(tmpDir);
+    const memoryDir = path.dirname(agent.memoryMdPath);
+    fs.writeFileSync(path.join(memoryDir, "facts.md"), "facts part", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "today.md"), "old today", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "week.md"), "week part", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "longterm.md"), "longterm part", "utf-8");
+    const engine = makeEngine(agent, tmpDir);
+    const app = mountConfigRoute(engine);
+
+    const res = await app.request("/api/memories/compiled/today?agentId=hana", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ today: "edited today" }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.today).toBe("edited today");
+    expect(fs.readFileSync(path.join(memoryDir, "today.md"), "utf-8")).toBe("edited today\n");
+    const memoryMd = fs.readFileSync(agent.memoryMdPath, "utf-8");
+    expect(memoryMd).toContain("## 今天\n\nedited today");
+    expect(memoryMd).toContain("## 重要事实\n\nfacts part");
+    expect(engine.updateConfig).toHaveBeenCalledWith({}, { agentId: "hana" });
+  });
+
+  it("rejects a non-string today payload", async () => {
+    const agent = makeAgent(tmpDir);
+    const engine = makeEngine(agent, tmpDir);
+    const app = mountConfigRoute(engine);
+
+    const res = await app.request("/api/memories/compiled/today?agentId=hana", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ today: 123 }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("saves edited longterm straight to longterm.md and rebuilds compiled memory", async () => {
+    const agent = makeAgent(tmpDir);
+    const memoryDir = path.dirname(agent.memoryMdPath);
+    fs.writeFileSync(path.join(memoryDir, "facts.md"), "facts part", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "today.md"), "today part", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "week.md"), "week part", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "longterm.md"), "old longterm", "utf-8");
+    const engine = makeEngine(agent, tmpDir);
+    const app = mountConfigRoute(engine);
+
+    const res = await app.request("/api/memories/compiled/longterm?agentId=hana", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ longterm: "edited longterm" }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.ok).toBe(true);
+    expect(data.longterm).toBe("edited longterm");
+    expect(fs.readFileSync(path.join(memoryDir, "longterm.md"), "utf-8")).toBe("edited longterm\n");
+    const memoryMd = fs.readFileSync(agent.memoryMdPath, "utf-8");
+    expect(memoryMd).toContain("## 长期情况\n\nedited longterm");
+    expect(engine.updateConfig).toHaveBeenCalledWith({}, { agentId: "hana" });
+  });
+
+  it("rejects a non-string longterm payload", async () => {
+    const agent = makeAgent(tmpDir);
+    const engine = makeEngine(agent, tmpDir);
+    const app = mountConfigRoute(engine);
+
+    const res = await app.request("/api/memories/compiled/longterm?agentId=hana", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ longterm: null }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  describe("week day entries", () => {
+    function writeDailyFile(memoryDir, date, body) {
+      const dailyDir = path.join(memoryDir, "daily");
+      fs.mkdirSync(dailyDir, { recursive: true });
+      fs.writeFileSync(path.join(dailyDir, `${date}.md`), `## ${date}\n\n${body}\n`, "utf-8");
+    }
+
+    it("lists existing daily entries with heading-stripped bodies", async () => {
+      const agent = makeAgent(tmpDir);
+      const memoryDir = path.dirname(agent.memoryMdPath);
+      writeDailyFile(memoryDir, "2026-07-01", "第一天的记录。");
+      writeDailyFile(memoryDir, "2026-07-02", "第二天的记录。");
+      const engine = makeEngine(agent, tmpDir);
+      const app = mountConfigRoute(engine);
+
+      const res = await app.request("/api/memories/compiled/week/days?agentId=hana");
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.days).toEqual([
+        { date: "2026-07-01", body: "第一天的记录。" },
+        { date: "2026-07-02", body: "第二天的记录。" },
+      ]);
+    });
+
+    it("saves an edited day, reassembles week.md from daily/, and rebuilds memory.md", async () => {
+      const agent = makeAgent(tmpDir);
+      const memoryDir = path.dirname(agent.memoryMdPath);
+      fs.writeFileSync(path.join(memoryDir, "facts.md"), "facts part", "utf-8");
+      fs.writeFileSync(path.join(memoryDir, "today.md"), "today part", "utf-8");
+      fs.writeFileSync(path.join(memoryDir, "longterm.md"), "longterm part", "utf-8");
+      writeDailyFile(memoryDir, "2026-07-01", "旧的第一天记录。");
+      writeDailyFile(memoryDir, "2026-07-02", "第二天的记录。");
+      const engine = makeEngine(agent, tmpDir);
+      const app = mountConfigRoute(engine);
+
+      const res = await app.request("/api/memories/compiled/week/days/2026-07-01?agentId=hana", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "编辑后的第一天记录。" }),
+      });
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(data.body).toBe("编辑后的第一天记录。");
+
+      const dailyFile = fs.readFileSync(path.join(memoryDir, "daily", "2026-07-01.md"), "utf-8");
+      expect(dailyFile).toBe("## 2026-07-01\n\n编辑后的第一天记录。\n");
+
+      // week.md must be reassembled purely from daily/ (no LLM call in this route)
+      const weekMd = fs.readFileSync(path.join(memoryDir, "week.md"), "utf-8");
+      expect(weekMd).toContain("编辑后的第一天记录。");
+      expect(weekMd).not.toContain("旧的第一天记录。");
+      expect(weekMd).toContain("第二天的记录。");
+
+      const memoryMd = fs.readFileSync(agent.memoryMdPath, "utf-8");
+      expect(memoryMd).toContain("编辑后的第一天记录。");
+      expect(engine.updateConfig).toHaveBeenCalledWith({}, { agentId: "hana" });
+    });
+
+    it("rejects editing a date with no existing daily entry", async () => {
+      const agent = makeAgent(tmpDir);
+      const memoryDir = path.dirname(agent.memoryMdPath);
+      writeDailyFile(memoryDir, "2026-07-02", "第二天的记录。");
+      const engine = makeEngine(agent, tmpDir);
+      const app = mountConfigRoute(engine);
+
+      const res = await app.request("/api/memories/compiled/week/days/2026-07-01?agentId=hana", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "凭空造出的一天" }),
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("rejects a malformed date parameter", async () => {
+      const agent = makeAgent(tmpDir);
+      const engine = makeEngine(agent, tmpDir);
+      const app = mountConfigRoute(engine);
+
+      const res = await app.request("/api/memories/compiled/week/days/not-a-date?agentId=hana", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "x" }),
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects a non-string body payload", async () => {
+      const agent = makeAgent(tmpDir);
+      const memoryDir = path.dirname(agent.memoryMdPath);
+      writeDailyFile(memoryDir, "2026-07-01", "第一天的记录。");
+      const engine = makeEngine(agent, tmpDir);
+      const app = mountConfigRoute(engine);
+
+      const res = await app.request("/api/memories/compiled/week/days/2026-07-01?agentId=hana", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: 42 }),
+      });
+
+      expect(res.status).toBe(400);
+    });
+  });
 });

@@ -1481,6 +1481,23 @@
       "compiledEmpty": "コンパイル済みの記憶はまだありません",
       "compiledClear": "クリア",
       "compiledCleared": "コンパイル済みの記憶をクリアしました",
+      "editableFactsLabel": "重要な事実",
+      "saveFacts": "Factsを保存",
+      "factsSaved": "Factsを保存しました",
+      "readonlyTimelineTitle": "タイムライン記憶",
+      "editEntry": "編集",
+      "editDone": "完了",
+      "saveToday": "今日を保存",
+      "todaySaved": "今日の記憶を保存しました",
+      "saveLongterm": "長期情報を保存",
+      "longtermSaved": "長期情報を保存しました",
+      "saveDay": "この日を保存",
+      "daySaved": "この日を保存しました",
+      "sections": {
+        "today": "今日",
+        "week": "今週のこれまで",
+        "longterm": "長期的な状況"
+      },
       "health": {
         "healthy": "記憶の整理は正常です",
         "degraded": "記憶の整理に遅れがあります",

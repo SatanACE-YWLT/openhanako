@@ -17,9 +17,13 @@ import {
 } from "../../lib/memory/compiled-memory-state.ts";
 import {
   buildCompiledMemoryMarkdown,
+  listWeekDayEntries,
   migrateLegacyEditableFacts,
   readCompiledMemorySections,
   writeEditableFactsSection,
+  writeLongtermSection,
+  writeTodaySection,
+  writeWeekDayEntry,
 } from "../../lib/memory/compile.ts";
 import {
   readPinnedMemoryItems,
@@ -636,6 +640,94 @@ export function createConfigRoute(engine: any) {
       debugLog()?.log("api", `PUT /api/memories/compiled/facts agent=${agent.id}`);
       await engine.updateConfig({}, { agentId: agent.id });
       return c.json({ ok: true, facts: normalizedFacts });
+    } catch (err) {
+      if (err instanceof AgentNotFoundError) return c.json({ error: err.message }, 404);
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  route.put("/memories/compiled/today", async (c) => {
+    try {
+      const denied = denyWithoutScope(c, "settings.write");
+      if (denied) return denied;
+      const agent = resolveAgentStrict(engine, c);
+      const body = await safeJson(c);
+      if (typeof body?.today !== "string") {
+        return c.json({ error: "today must be a string" }, 400);
+      }
+      const memDir = path.dirname(agent.memoryMdPath);
+      const normalizedToday = writeTodaySection(memDir, body.today, {
+        memoryMdPath: agent.memoryMdPath,
+      });
+      debugLog()?.log("api", `PUT /api/memories/compiled/today agent=${agent.id}`);
+      await engine.updateConfig({}, { agentId: agent.id });
+      return c.json({ ok: true, today: normalizedToday });
+    } catch (err) {
+      if (err instanceof AgentNotFoundError) return c.json({ error: err.message }, 404);
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  route.put("/memories/compiled/longterm", async (c) => {
+    try {
+      const denied = denyWithoutScope(c, "settings.write");
+      if (denied) return denied;
+      const agent = resolveAgentStrict(engine, c);
+      const body = await safeJson(c);
+      if (typeof body?.longterm !== "string") {
+        return c.json({ error: "longterm must be a string" }, 400);
+      }
+      const memDir = path.dirname(agent.memoryMdPath);
+      const normalizedLongterm = writeLongtermSection(memDir, body.longterm, {
+        memoryMdPath: agent.memoryMdPath,
+      });
+      debugLog()?.log("api", `PUT /api/memories/compiled/longterm agent=${agent.id}`);
+      await engine.updateConfig({}, { agentId: agent.id });
+      return c.json({ ok: true, longterm: normalizedLongterm });
+    } catch (err) {
+      if (err instanceof AgentNotFoundError) return c.json({ error: err.message }, 404);
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  // 读取按天的 week 日记条目，供编辑 UI 按天分行展示
+  route.get("/memories/compiled/week/days", async (c) => {
+    try {
+      const agent = resolveAgent(engine, c);
+      const memDir = path.dirname(agent.memoryMdPath);
+      const days = listWeekDayEntries(memDir);
+      return c.json({ days });
+    } catch (err) {
+      if (err instanceof AgentNotFoundError) return c.json({ error: err.message }, 404);
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  // 改写某一天的日记正文，重新装配 week.md 并同步 memory.md；只能改写已存在的日期
+  route.put("/memories/compiled/week/days/:date", async (c) => {
+    try {
+      const denied = denyWithoutScope(c, "settings.write");
+      if (denied) return denied;
+      const agent = resolveAgentStrict(engine, c);
+      const date = c.req.param("date");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) {
+        return c.json({ error: "date must be YYYY-MM-DD" }, 400);
+      }
+      const body = await safeJson(c);
+      if (typeof body?.body !== "string") {
+        return c.json({ error: "body must be a string" }, 400);
+      }
+      const memDir = path.dirname(agent.memoryMdPath);
+      const existingDates = new Set(listWeekDayEntries(memDir).map((entry) => entry.date));
+      if (!existingDates.has(date)) {
+        return c.json({ error: `no daily entry for date "${date}"` }, 404);
+      }
+      const normalizedBody = writeWeekDayEntry(memDir, date, body.body, {
+        memoryMdPath: agent.memoryMdPath,
+      });
+      debugLog()?.log("api", `PUT /api/memories/compiled/week/days/${date} agent=${agent.id}`);
+      await engine.updateConfig({}, { agentId: agent.id });
+      return c.json({ ok: true, date, body: normalizedBody });
     } catch (err) {
       if (err instanceof AgentNotFoundError) return c.json({ error: err.message }, 404);
       return c.json({ error: err.message }, 500);

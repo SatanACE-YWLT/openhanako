@@ -1481,6 +1481,23 @@
       "compiledEmpty": "아직 정리된 기억이 없어요",
       "compiledClear": "초기화",
       "compiledCleared": "정리된 기억이 초기화됨",
+      "editableFactsLabel": "중요한 사실",
+      "saveFacts": "Facts 저장",
+      "factsSaved": "Facts가 저장됐어요",
+      "readonlyTimelineTitle": "타임라인 기억",
+      "editEntry": "편집",
+      "editDone": "완료",
+      "saveToday": "오늘 저장",
+      "todaySaved": "오늘 기억이 저장됐어요",
+      "saveLongterm": "장기 상황 저장",
+      "longtermSaved": "장기 상황이 저장됐어요",
+      "saveDay": "이 날 저장",
+      "daySaved": "이 날이 저장됐어요",
+      "sections": {
+        "today": "오늘",
+        "week": "이번 주 초",
+        "longterm": "장기 상황"
+      },
       "health": {
         "healthy": "기억 정리가 정상이에요",
         "degraded": "기억 정리가 지연되고 있어요",

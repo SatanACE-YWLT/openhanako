@@ -32,6 +32,9 @@ import {
   rollDailyWindow,
   migrateLegacyWeekToLongterm,
   compileLongterm,
+  listDailyEntries,
+  readDailyEntryBody,
+  writeDailyEntryBody,
 } from "../lib/memory/compile.ts";
 import { callText } from "../core/llm-client.ts";
 import { shiftLogicalDate } from "../lib/time-utils.ts";
@@ -334,6 +337,91 @@ describe("assembleWeekFromDaily", () => {
     expect(content).toContain("唯一有效的一天。");
     expect(content).not.toContain("旧数据");
     expect(content).not.toContain("abc123");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listDailyEntries / readDailyEntryBody / writeDailyEntryBody — manual edit primitives
+// ---------------------------------------------------------------------------
+
+describe("listDailyEntries / readDailyEntryBody / writeDailyEntryBody", () => {
+  let tmpDir;
+  let dailyDir;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-daily-edit-"));
+    dailyDir = path.join(tmpDir, "daily");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("listDailyEntries returns an empty array when the directory does not exist", () => {
+    expect(listDailyEntries(dailyDir)).toEqual([]);
+  });
+
+  it("listDailyEntries keeps only the most recent maxDays entries in date order", () => {
+    fs.mkdirSync(dailyDir, { recursive: true });
+    for (let i = 1; i <= 9; i++) {
+      const d = `2026-07-${String(i).padStart(2, "0")}`;
+      fs.writeFileSync(path.join(dailyDir, `${d}.md`), `## ${d}\n\n内容${i}\n`, "utf-8");
+    }
+
+    const entries = listDailyEntries(dailyDir, { maxDays: 7 });
+
+    expect(entries.map((e) => e.date)).toEqual([
+      "2026-07-03", "2026-07-04", "2026-07-05", "2026-07-06",
+      "2026-07-07", "2026-07-08", "2026-07-09",
+    ]);
+  });
+
+  it("readDailyEntryBody strips the '## {date}' heading and returns the body only", () => {
+    fs.mkdirSync(dailyDir, { recursive: true });
+    fs.writeFileSync(path.join(dailyDir, "2026-07-03.md"), "## 2026-07-03\n\n用户关注记忆系统。\n", "utf-8");
+
+    expect(readDailyEntryBody(dailyDir, "2026-07-03")).toBe("用户关注记忆系统。");
+  });
+
+  it("readDailyEntryBody returns an empty string when the file does not exist", () => {
+    expect(readDailyEntryBody(dailyDir, "2026-07-03")).toBe("");
+  });
+
+  it("writeDailyEntryBody writes the exact compileDaily output format", () => {
+    writeDailyEntryBody(dailyDir, "2026-07-03", "手动编辑的内容。");
+
+    const content = fs.readFileSync(path.join(dailyDir, "2026-07-03.md"), "utf-8");
+    expect(content).toBe("## 2026-07-03\n\n手动编辑的内容。\n");
+  });
+
+  it("writeDailyEntryBody clears the file to empty when body is blank (zero placeholder)", () => {
+    writeDailyEntryBody(dailyDir, "2026-07-03", "有内容");
+    writeDailyEntryBody(dailyDir, "2026-07-03", "");
+
+    expect(fs.readFileSync(path.join(dailyDir, "2026-07-03.md"), "utf-8")).toBe("");
+  });
+
+  it("writeDailyEntryBody does not touch the fingerprint sidecar", () => {
+    fs.mkdirSync(dailyDir, { recursive: true });
+    fs.writeFileSync(path.join(dailyDir, "2026-07-03.md.fingerprint"), "some-fp", "utf-8");
+
+    writeDailyEntryBody(dailyDir, "2026-07-03", "手动编辑。");
+
+    expect(fs.readFileSync(path.join(dailyDir, "2026-07-03.md.fingerprint"), "utf-8")).toBe("some-fp");
+  });
+
+  it("round-trips through assembleWeekFromDaily after a manual edit", () => {
+    writeDailyEntryBody(dailyDir, "2026-07-01", "最初的第一天记录。");
+    writeDailyEntryBody(dailyDir, "2026-07-02", "第二天记录。");
+    writeDailyEntryBody(dailyDir, "2026-07-01", "编辑后的第一天记录。");
+
+    const weekPath = path.join(tmpDir, "week.md");
+    assembleWeekFromDaily(dailyDir, weekPath);
+
+    const content = fs.readFileSync(weekPath, "utf-8");
+    expect(content).toContain("编辑后的第一天记录。");
+    expect(content).not.toContain("最初的第一天记录。");
+    expect(content).toContain("第二天记录。");
   });
 });
 

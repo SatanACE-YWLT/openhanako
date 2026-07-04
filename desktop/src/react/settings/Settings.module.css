@@ -6260,6 +6260,22 @@ a.about-link:hover {
     opacity: 1;
 }
 
+.compiled-edit-toggle-btn {
+    font-size: var(--fs-hint);
+    color: var(--text-light);
+    background: none;
+    border: 1px solid var(--overlay-light);
+    border-radius: var(--radius-input, 6px);
+    padding: 2px 8px;
+    cursor: default;
+    opacity: 0.7;
+    transition: opacity var(--duration-fast);
+}
+
+.compiled-edit-toggle-btn:hover {
+    opacity: 1;
+}
+
 .compiled-memory-body {
     font-size: var(--fs-ui);
 }
@@ -6368,6 +6384,58 @@ a.about-link:hover {
 
 .compiled-view-btn {
     width: 100%;
+}
+
+.compiled-memory-edit-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    border-top: 1px solid var(--overlay-light);
+    padding-top: var(--space-16);
+}
+
+.compiled-memory-edit-section:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+
+.compiled-memory-week-days {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+}
+
+.compiled-memory-week-day-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    border-left: 2px solid var(--overlay-light);
+    padding-left: var(--space-8);
+}
+
+.compiled-memory-week-day-label {
+    font-size: var(--fs-hint);
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.compiled-memory-week-day-editor {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input, 6px);
+    background: var(--bg);
+    color: var(--text);
+    padding: var(--space-8) var(--space-16);
+    font: inherit;
+    line-height: 1.65;
+    outline: none;
+}
+
+.compiled-memory-week-day-editor:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* 实验功能：Cache Snapshot 观察区 */

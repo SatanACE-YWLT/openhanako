@@ -1473,6 +1473,23 @@
       "compiledEmpty": "還沒有編譯過記憶",
       "compiledClear": "清空",
       "compiledCleared": "編譯記憶已清空",
+      "editableFactsLabel": "重要事實",
+      "saveFacts": "儲存 Facts",
+      "factsSaved": "Facts 已儲存",
+      "readonlyTimelineTitle": "時間線記憶",
+      "editEntry": "編輯",
+      "editDone": "完成",
+      "saveToday": "儲存今天",
+      "todaySaved": "今天已儲存",
+      "saveLongterm": "儲存長期情況",
+      "longtermSaved": "長期情況已儲存",
+      "saveDay": "儲存這一天",
+      "daySaved": "這一天已儲存",
+      "sections": {
+        "today": "今天",
+        "week": "本週早些時候",
+        "longterm": "長期情況"
+      },
       "health": {
         "healthy": "記憶整理正常",
         "degraded": "記憶整理有延遲",

@@ -280,6 +280,56 @@ function _listDailyEntries(dailyDir) {
 }
 
 /**
+ * 列出 memory/daily/ 目录下现存的日记条目（按日期正序），供编辑 UI 展示。
+ * 只读、纯文件操作；不存在的日期不会被凭空造出空行——与 compileDaily 的零占位
+ * 策略保持一致（没内容的那天本来就不产文件）。
+ *
+ * @param {string} dailyDir
+ * @param {{ maxDays?: number }} [opts]
+ * @returns {{ date: string, filePath: string }[]}
+ */
+export function listDailyEntries(dailyDir, opts: { maxDays?: number } = {}) {
+  const maxDays = opts.maxDays || DAILY_WINDOW_RETENTION_DAYS;
+  return _listDailyEntries(dailyDir).slice(-maxDays);
+}
+
+/**
+ * 读取单日日记正文（不含 "## {date}" 抬头——抬头由 UI 层的日期行标签承担，
+ * 与 assemble() 读 week.md 时用 normalizeCompiledSectionBody 剥离标题行的
+ * 处理方式一致）。文件不存在时返回空字符串。
+ *
+ * @param {string} dailyDir
+ * @param {string} date - YYYY-MM-DD
+ * @returns {string}
+ */
+export function readDailyEntryBody(dailyDir, date) {
+  const filePath = path.join(dailyDir, `${date}.md`);
+  return normalizeCompiledSectionBody(safeReadFile(filePath, ""));
+}
+
+/**
+ * 写入单日日记正文（用户手动编辑）。输出格式与 compileDaily 的真实产物完全
+ * 一致（"## {date}\n\n{body}\n"），保证 assembleWeekFromDaily 读到的格式不变。
+ * 正文为空时清空该文件（保持与 compileDaily 的零占位约定一致，不留悬空标题）。
+ *
+ * 不触碰 {date}.md.fingerprint：与 facts.md 手动编辑不触碰
+ * editable-facts-state.json 水位线是同一处理原则——手动编辑是权威改写，
+ * 后续自动编译从原有水位线/指纹继续跑，不因这次手动写入而重新触发或跳过。
+ *
+ * @param {string} dailyDir
+ * @param {string} date - YYYY-MM-DD
+ * @param {string} body
+ * @returns {string} 写入后的规范化正文
+ */
+export function writeDailyEntryBody(dailyDir, date, body) {
+  fs.mkdirSync(dailyDir, { recursive: true });
+  const filePath = path.join(dailyDir, `${date}.md`);
+  const normalizedBody = normalizeCompiledSectionBody(String(body ?? ""));
+  atomicWrite(filePath, normalizedBody ? `## ${date}\n\n${normalizedBody}\n` : "");
+  return normalizedBody;
+}
+
+/**
  * 从 memory/daily/ 目录纯文件装配 week.md：取最近 N 天的日记条目按日期正序
  * 拼接。零 LLM 调用——week 段不再是独立编译产物，而是 daily 条目的滚动列表。
  *
@@ -465,6 +515,90 @@ export function writeEditableFactsSection(memoryDir, facts, opts: Record<string,
     opts.memoryMdPath || path.join(memoryDir, "memory.md"),
   );
   return normalizedFacts;
+}
+
+function _assembleMemoryMd(memoryDir, opts: Record<string, any> = {}) {
+  assemble(
+    path.join(memoryDir, "facts.md"),
+    path.join(memoryDir, "today.md"),
+    path.join(memoryDir, "week.md"),
+    path.join(memoryDir, "longterm.md"),
+    opts.memoryMdPath || path.join(memoryDir, "memory.md"),
+  );
+}
+
+/**
+ * 手动改写 today.md（权威改写，覆盖当前草稿）。today.md 是 compileToday 的增量
+ * 维护产物，手动保存后视为新的权威基底；不重置 today-state.json 水位线——
+ * 下次 compileToday 仍按原有水位线取 delta，与旧草稿合并（这份手动改写就是
+ * 合并的起点），不会因这次编辑而重新拉取全天摘要。
+ *
+ * @param {string} memoryDir
+ * @param {string} today
+ * @param {{ memoryMdPath?: string }} [opts]
+ * @returns {string} 写入后的规范化正文
+ */
+export function writeTodaySection(memoryDir, today, opts: Record<string, any> = {}) {
+  const targetPath = path.join(memoryDir, "today.md");
+  const normalized = normalizeCompiledSectionBody(String(today ?? ""));
+  atomicWrite(targetPath, normalized ? `${normalized}\n` : "");
+  _assembleMemoryMd(memoryDir, opts);
+  return normalized;
+}
+
+/**
+ * 手动改写 longterm.md（权威改写）。不触碰 longterm.md.fingerprint——
+ * 下一次 rollDailyWindow / compileLongterm 按内容重新计算指纹，这次手动写入
+ * 之后如果被新 fold 内容覆盖，指纹天然会因内容变化而不命中旧值，不需要显式清理。
+ *
+ * @param {string} memoryDir
+ * @param {string} longterm
+ * @param {{ memoryMdPath?: string }} [opts]
+ * @returns {string} 写入后的规范化正文
+ */
+export function writeLongtermSection(memoryDir, longterm, opts: Record<string, any> = {}) {
+  const targetPath = path.join(memoryDir, "longterm.md");
+  const normalized = normalizeCompiledSectionBody(String(longterm ?? ""));
+  atomicWrite(targetPath, normalized ? `${normalized}\n` : "");
+  _assembleMemoryMd(memoryDir, opts);
+  return normalized;
+}
+
+/**
+ * 列出 week 编辑视图需要的按天条目：{ date, body }[]，body 已剥离 "## {date}"
+ * 抬头，正序排列（最近的日子在最后）。只读、纯文件操作。
+ *
+ * @param {string} memoryDir
+ * @returns {{ date: string, body: string }[]}
+ */
+export function listWeekDayEntries(memoryDir) {
+  const dailyDir = path.join(memoryDir, "daily");
+  return listDailyEntries(dailyDir).map(({ date }) => ({
+    date,
+    body: readDailyEntryBody(dailyDir, date),
+  }));
+}
+
+/**
+ * 手动改写某一天的日记正文，随后从 daily/ 目录纯文件重新装配 week.md
+ * （assembleWeekFromDaily 零 LLM），再重新拼 memory.md。
+ *
+ * 只允许改写已存在的日期条目（沿用 compileDaily 的零占位约定：没内容的
+ * 那天本来就不产文件，编辑 UI 也不应凭空造出新的一天）；调用方在路由层
+ * 校验日期是否存在于 listWeekDayEntries 的结果中。
+ *
+ * @param {string} memoryDir
+ * @param {string} date - YYYY-MM-DD
+ * @param {string} body
+ * @param {{ memoryMdPath?: string }} [opts]
+ * @returns {string} 写入后的规范化正文
+ */
+export function writeWeekDayEntry(memoryDir, date, body, opts: Record<string, any> = {}) {
+  const dailyDir = path.join(memoryDir, "daily");
+  const normalized = writeDailyEntryBody(dailyDir, date, body);
+  assembleWeekFromDaily(dailyDir, path.join(memoryDir, "week.md"));
+  _assembleMemoryMd(memoryDir, opts);
+  return normalized;
 }
 
 /**
