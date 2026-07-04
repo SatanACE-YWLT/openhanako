@@ -425,6 +425,7 @@ function isSettingsWriteRoute(verb, routePath) {
     || routePath === "/api/speech-recognition/config"
     || /^\/api\/agents\/[^/]+\/(?:identity|ishiki|public-ishiki|pinned|experience)$/.test(routePath)
     || /^\/api\/agents\/[^/]+\/config$/.test(routePath)
+    || routePath === "/api/memories/compiled/facts"
     || routePath === "/api/memories/compiled/today"
     || routePath === "/api/memories/compiled/longterm"
     || /^\/api\/memories\/compiled\/week\/days\/\d{4}-\d{2}-\d{2}$/.test(routePath)

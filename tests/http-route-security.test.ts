@@ -203,6 +203,7 @@ describe("HTTP route security policy", () => {
       ["DELETE", "/api/memories"],
       ["DELETE", "/api/memories/compiled"],
       ["POST", "/api/memories/import"],
+      ["PUT", "/api/memories/compiled/facts"],
     ]) {
       expect(authorizeHttpRoute({ method, path, principal: writer }), `${method} ${path}`)
         .toMatchObject({ allowed: true });
