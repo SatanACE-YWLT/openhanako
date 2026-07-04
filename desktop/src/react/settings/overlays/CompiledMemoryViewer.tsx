@@ -9,14 +9,12 @@ import styles from '../Settings.module.css';
 
 export function CompiledMemoryViewer() {
   const [visible, setVisible] = useState(false);
-  const [content, setContent] = useState('');
-  const [editableFactsEnabled, setEditableFactsEnabled] = useState(false);
   const [sections, setSections] = useState({ facts: '', today: '', week: '', longterm: '' });
   const [factsDraft, setFactsDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [savingFacts, setSavingFacts] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  useMermaidDiagrams(contentRef, [content, sections, loading]);
+  useMermaidDiagrams(contentRef, [sections, loading]);
 
   useEffect(() => {
     const handler = () => { setVisible(true); load(); };
@@ -30,21 +28,18 @@ export function CompiledMemoryViewer() {
       const aid = useSettingsStore.getState().getSettingsAgentId();
       const res = await hanaFetch(`/api/memories/compiled?agentId=${aid}`);
       const data = await res.json();
-      setContent(data.content || '');
       const nextSections = {
         facts: data.sections?.facts || '',
         today: data.sections?.today || '',
         week: data.sections?.week || '',
         longterm: data.sections?.longterm || '',
       };
-      setEditableFactsEnabled(data.editableFactsEnabled === true);
       setSections(nextSections);
       setFactsDraft(nextSections.facts);
     } catch (err: any) {
-      setContent(`Error: ${err.message}`);
-      setEditableFactsEnabled(false);
       setSections({ facts: '', today: '', week: '', longterm: '' });
       setFactsDraft('');
+      useSettingsStore.getState().showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -54,12 +49,7 @@ export function CompiledMemoryViewer() {
     try {
       const aid = useSettingsStore.getState().getSettingsAgentId();
       await hanaFetch(`/api/memories/compiled?agentId=${aid}`, { method: 'DELETE' });
-      setContent('');
-      setSections(prev => (
-        editableFactsEnabled
-          ? { ...prev, today: '', week: '', longterm: '' }
-          : { facts: '', today: '', week: '', longterm: '' }
-      ));
+      setSections(prev => ({ ...prev, today: '', week: '', longterm: '' }));
       useSettingsStore.getState().showToast(t('settings.memory.compiledCleared'), 'success');
     } catch (err: any) {
       useSettingsStore.getState().showToast(err.message, 'error');
@@ -117,7 +107,7 @@ export function CompiledMemoryViewer() {
         <div className={`${styles['memory-viewer-body']} ${styles['compiled-memory-body']}`}>
           {loading ? (
             <div className="memory-viewer-empty">Loading...</div>
-          ) : editableFactsEnabled ? (
+          ) : (
             <div className={styles['compiled-memory-editable']}>
               <label className={styles['compiled-memory-editor-label']} htmlFor="compiled-memory-facts-editor">
                 {t('settings.memory.editableFactsLabel')}
@@ -158,14 +148,6 @@ export function CompiledMemoryViewer() {
                 ))}
               </div>
             </div>
-          ) : content.trim() ? (
-            <div
-              ref={contentRef}
-              className={`${styles['compiled-memory-md']} ${'md-content'}`}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
-            />
-          ) : (
-            <div className="memory-viewer-empty">{t('settings.memory.compiledEmpty')}</div>
           )}
         </div>
     </Overlay>

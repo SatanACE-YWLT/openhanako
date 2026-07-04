@@ -4,9 +4,13 @@
  * 触发机制改为 turn-based：
  * - 每 10 轮：滚动摘要 + compileToday + assemble
  * - session 结束：final 滚动摘要 + compileToday + assemble
- * - 每天一次（日期变化时触发）：compileWeek + compileLongterm + compileFacts + assemble + deep-memory
+ * - 每天一次（日期变化时触发）：compileWeek + compileLongterm + compileEditableFacts + assemble + deep-memory
  *
  * session 关闭记忆时，整条记忆流水线都应跳过，避免被写入 summary/facts。
+ *
+ * facts.md 是唯一的 facts 产物：曾经的 `memory.editable_facts` 实验已毕业，
+ * 增量编译（compileEditableFacts）是唯一路径。创建 ticker 时会先跑一次幂等的
+ * 读时迁移，把 alpha 阶段遗留的 editable-facts.md 并入 facts.md。
  */
 
 import fs from "fs";
@@ -17,11 +21,10 @@ import {
   compileToday,
   compileWeek,
   compileLongterm,
-  compileFacts,
   compileEditableFacts,
   assemble,
-  editableFactsPath,
   ensureEditableFactsBaseline,
+  migrateLegacyEditableFacts,
 } from "./compile.ts";
 import { processDirtySessions } from "./deep-memory.ts";
 import { getLogicalDay } from "../time-utils.ts";
@@ -40,7 +43,10 @@ const log = createModuleLogger("memory-ticker");
 const TURNS_PER_SUMMARY = 10;   // 每隔多少轮触发一次滚动摘要
 const CACHE_SNAPSHOT_PREVIEW_LIMIT = 16_000;
 const DAILY_STATE_FILE = "daily-state.json";
-const DAILY_STATE_SCHEMA_VERSION = 1;
+// v2：facts 转正后 compileFacts 步骤恒走 compileEditableFacts，daily-state.json
+// 不再需要 factsMode 字段；版本号提升让旧 schema 的持久化状态被判定为不匹配，
+// 走一次性重算（幂等，不会重复计费）。
+const DAILY_STATE_SCHEMA_VERSION = 2;
 const DAILY_STEP_KEYS = ["compileToday", "compileWeek", "compileLongterm", "compileFacts", "deepMemory"];
 
 // ── 主调度器 ──
@@ -64,7 +70,6 @@ const DAILY_STEP_KEYS = ["compileToday", "compileWeek", "compileLongterm", "comp
  * @param {(sessionPath: string) => boolean} [opts.isSessionMemoryEnabled] - 返回指定 session 的记忆状态
  * @param {function} [opts.getTimezone] - 返回用户配置时区
  * @param {function} [opts.getCacheSnapshotReflectionMode] - retired; runtime is hard-gated to off
- * @param {function} [opts.getEditableMemoryEnabled] - 返回可编辑 Facts 实验开关
  * @param {(sessionPath: string) => object|null} [opts.readMemoryReflectionSnapshot] - 返回 session 创建时冻结的记忆反思快照
  * @param {string} [opts.agentId] - 当前 agent id，用于实验观察产物归属
  * @param {string} [opts.agentDir] - 当前 agent 数据目录，用于实验观察产物落盘
@@ -86,7 +91,6 @@ export function createMemoryTicker(opts) {
     getMemoryMasterEnabled,
     isSessionMemoryEnabled,
     getTimezone,
-    getEditableMemoryEnabled,
     readMemoryReflectionSnapshot,
     memoryReflectionRunner,
     buildSessionCacheSnapshot,
@@ -96,6 +100,14 @@ export function createMemoryTicker(opts) {
     memoryDir = path.dirname(memoryMdPath),
   } = opts;
   const _memoryReflectionRunner = memoryReflectionRunner || { runMemoryReflection: defaultRunMemoryReflection };
+
+  // 一次性、幂等的读时迁移：把 alpha 阶段遗留的 editable-facts.md 并入 facts.md。
+  // 必须早于 assemble/compileEditableFacts 首次读取 facts.md 之前跑完。
+  try {
+    migrateLegacyEditableFacts(memoryDir);
+  } catch (err) {
+    log.error(`facts.md 迁移失败: ${err.message}`);
+  }
 
   /** agent 级总开关 */
   const _isMemoryMasterOn = () => !getMemoryMasterEnabled || getMemoryMasterEnabled();
@@ -116,13 +128,11 @@ export function createMemoryTicker(opts) {
   const _getCacheSnapshotReflectionMode = () => {
     return "off";
   };
-  const _isEditableMemoryOn = () => getEditableMemoryEnabled?.() === true;
   const _factsSourcePath = () => {
-    if (!_isEditableMemoryOn()) return factsMdPath;
     ensureEditableFactsBaseline(memoryDir, summaryManager, {
-      seedFactsPath: factsMdPath,
+      outputPath: factsMdPath,
     });
-    return editableFactsPath(memoryDir);
+    return factsMdPath;
   };
   const _createSourceTimeRangeResolver = () => {
     const filesById = new Map(
@@ -156,7 +166,7 @@ export function createMemoryTicker(opts) {
   let _dailyRunning = false;
   let _lastDailyJobDate = null;
   let _dailyStepsDate = null;               // 当天已完成步骤所属日期
-  let _dailyStepsContextKey = null;          // 日期 + resetAt + factsMode，防止同日配置变更误跳过
+  let _dailyStepsContextKey = null;          // 日期 + resetAt，防止同日 reset 变更误跳过
   let _dailyCompletedAt = null;
   const _dailyStepsCompleted = new Set();    // 当天已完成的步骤名（断点续跑）
   const _dailyStepCompletedAt = new Map();   // stepName → ISO timestamp
@@ -229,20 +239,15 @@ export function createMemoryTicker(opts) {
     return new Date(value).toISOString();
   }
 
-  function _dailyFactsMode() {
-    return _isEditableMemoryOn() ? "editable" : "legacy";
-  }
-
   function _dailyContext(logicalDate = getLogicalDay().logicalDate) {
     return {
       logicalDate,
       resetAt: _normalizeResetAt(_getCompiledResetAt()),
-      factsMode: _dailyFactsMode(),
     };
   }
 
   function _dailyContextKey(context) {
-    return [context.logicalDate, context.resetAt || "", context.factsMode].join("\n");
+    return [context.logicalDate, context.resetAt || ""].join("\n");
   }
 
   function _isValidIso(value) {
@@ -260,7 +265,6 @@ export function createMemoryTicker(opts) {
       return {
         logicalDate: typeof raw.logicalDate === "string" ? raw.logicalDate : "",
         resetAt: _normalizeResetAt(raw.resetAt),
-        factsMode: raw.factsMode === "editable" ? "editable" : "legacy",
         completedSteps,
         dailyCompletedAt: _isValidIso(raw.dailyCompletedAt) ? new Date(raw.dailyCompletedAt).toISOString() : null,
       };
@@ -275,8 +279,7 @@ export function createMemoryTicker(opts) {
   function _stateMatchesContext(state, context) {
     return Boolean(state)
       && state.logicalDate === context.logicalDate
-      && state.resetAt === context.resetAt
-      && state.factsMode === context.factsMode;
+      && state.resetAt === context.resetAt;
   }
 
   function _allDailyStepsCompleted() {
@@ -328,7 +331,6 @@ export function createMemoryTicker(opts) {
       schemaVersion: DAILY_STATE_SCHEMA_VERSION,
       logicalDate: context.logicalDate,
       resetAt: context.resetAt,
-      factsMode: context.factsMode,
       completedSteps,
       dailyCompletedAt: _dailyCompletedAt,
       updatedAt: new Date().toISOString(),
@@ -735,17 +737,12 @@ export function createMemoryTicker(opts) {
         }
       }
 
-      // Step 3: compileFacts（独立于 step 1-2）
+      // Step 3: compileFacts（独立于 step 1-2）——恒走增量编译，facts.md 是唯一产物
       if (!_dailyStepsCompleted.has("compileFacts")) {
         try {
-          if (_isEditableMemoryOn()) {
-            await compileEditableFacts(summaryManager, editableFactsPath(memoryDir), getResolvedMemoryModel(), {
-              since: resetAt,
-              seedFactsPath: factsMdPath,
-            });
-          } else {
-            await compileFacts(summaryManager, factsMdPath, getResolvedMemoryModel(), { since: resetAt });
-          }
+          await compileEditableFacts(summaryManager, factsMdPath, getResolvedMemoryModel(), {
+            since: resetAt,
+          });
           _markDailyStepCompleted("compileFacts", context);
           _markSuccess("compileFacts");
           _markStepRecovered("compileFacts");

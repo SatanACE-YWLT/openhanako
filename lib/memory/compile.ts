@@ -2,10 +2,10 @@
  * compile.js — 记忆编译器（v3 四块独立编译 + assemble）
  *
  * 四个独立函数各自有指纹缓存，互不依赖：
- *   compileToday()    → today.md（当天 sessions）
- *   compileWeek()     → week.md（过去7天滑动窗口）
- *   compileLongterm() → longterm.md（fold 周报到长期）
- *   compileFacts()    → facts.md（重要事实，继承上一版）
+ *   compileToday()        → today.md（当天 sessions）
+ *   compileWeek()         → week.md（过去7天滑动窗口）
+ *   compileLongterm()     → longterm.md（fold 周报到长期）
+ *   compileEditableFacts()→ facts.md（重要事实，增量编译 + 水位线跟踪，唯一路径）
  *
  * assemble() 同步读取四个文件，拼成 memory.md（≤2000 token）。
  */
@@ -21,7 +21,6 @@ import { normalizeCompiledLLMResult, normalizeCompiledSectionBody } from "./comp
 import { attachPromptLayoutMetadata, buildUtilityPromptLayout } from "../llm/prompt-layout.ts";
 import {
   buildCompileEditableFactsPrompt,
-  buildCompileFactsPrompt,
   buildCompileLongtermPrompt,
   buildCompileTodayPrompt,
   buildCompileWeekPrompt,
@@ -43,14 +42,13 @@ const EMPTY_MEMORY_ZH = "（暂无记忆）\n";
 const EMPTY_MEMORY_EN = "(No memory yet)\n";
 export function getEmptyMemory() { return _isZh() ? EMPTY_MEMORY_ZH : EMPTY_MEMORY_EN; }
 
-export const EDITABLE_FACTS_FILE = "editable-facts.md";
+// editable-facts-state.json 只做增量编译水位线跟踪，与产物文件名（facts.md）解耦。
 export const EDITABLE_FACTS_STATE_FILE = "editable-facts-state.json";
 
 const COMPILE_PROMPT_BUILDERS = {
   compile_today: buildCompileTodayPrompt,
   compile_week: buildCompileWeekPrompt,
   compile_longterm: buildCompileLongtermPrompt,
-  compile_facts: buildCompileFactsPrompt,
   compile_editable_facts: buildCompileEditableFactsPrompt,
 };
 
@@ -274,93 +272,18 @@ export async function compileLongterm(weekMdPath, longtermPath, resolvedModel) {
   return "compiled";
 }
 
-/**
- * 从近期 session 摘要的 重要事实 / Key Facts 段编译 facts.md
- * @param {object} resolvedModel
- */
-export async function compileFacts(summaryManager, outputPath, resolvedModel, opts: { since?: any } = {}) {
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-
-  // 读取上一版 facts.md 作为继承基础（避免 30 天外的稳定属性丢失）
-  const prevFacts = safeReadFile(outputPath, "").trim();
-
-  // 取最近 30 天的新摘要，提取 重要事实 / Key Facts 段。
-  // 兼容旧 H2 摘要和新 H3 摘要，避免调整 rolling summary 层级时丢老数据。
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
-  const sessions = summaryManager.getSummariesInRange(thirtyDaysAgo, now, { since: opts.since || null });
-
-  const factParts = [];
-  const skippedSessionIds = [];
-  for (const s of sessions) {
-    if (!s.summary) continue;
-    // 读时兼容（#1628）：缺少 重要事实 / Key Facts 标题段的旧自由格式摘要
-    // 无法提取，显式跳过并记录，不能静默吞掉也不能崩溃。
-    if (!hasFactSectionHeading(s.summary)) {
-      skippedSessionIds.push(s.session_id);
-      continue;
-    }
-    const text = extractFactSection(s.summary);
-    if (text && !isEmptyFactSection(text)) factParts.push(text);
-  }
-  if (skippedSessionIds.length > 0) {
-    log.warn(`compileFacts: ${skippedSessionIds.length} 份摘要缺少 ${FACT_SECTION_TITLES.join("/")} 标题段，已跳过: ${skippedSessionIds.join(", ")}`);
-  }
-
-  // 没有新摘要时：保留旧 facts 原样
-  if (factParts.length === 0) {
-    if (!prevFacts) atomicWrite(outputPath, "");
-    return "compiled";
-  }
-
-  const newFacts = factParts.join("\n");
-  const isZh = _isZh();
-  const combined = prevFacts
-    ? (isZh
-        ? `## 现有 Facts\n\n${prevFacts}\n\n## 新增候选 Facts\n\n${newFacts}`
-        : `## Existing Facts\n\n${prevFacts}\n\n## New Candidate Facts\n\n${newFacts}`)
-    : (isZh
-        ? `## 新增候选 Facts\n\n${newFacts}`
-        : `## New Candidate Facts\n\n${newFacts}`);
-
-  const result = await _compactLLM(
-    combined,
-    buildCompileFactsPrompt(getLocale()),
-    resolvedModel,
-    300,
-    "compile_facts",
-  );
-
-  atomicWrite(outputPath, normalizeCompiledLLMResult(result, "compileFacts"));
-  return "compiled";
-}
-
-export function editableFactsPath(memoryDir) {
-  return path.join(memoryDir, EDITABLE_FACTS_FILE);
-}
-
 export function editableFactsStatePath(memoryDir) {
   return path.join(memoryDir, EDITABLE_FACTS_STATE_FILE);
 }
 
 export function readEditableFactsText(memoryDir) {
-  const editablePath = editableFactsPath(memoryDir);
-  const sourcePath = fs.existsSync(editablePath)
-    ? editablePath
-    : path.join(memoryDir, "facts.md");
-  return normalizeCompiledSectionBody(safeReadFile(sourcePath, ""));
+  return normalizeCompiledSectionBody(safeReadFile(path.join(memoryDir, "facts.md"), ""));
 }
 
 export function readCompiledMemorySections(memoryDir, opts: Record<string, any> = {}) {
-  const editableFactsEnabled = opts.editableFactsEnabled === true;
-  if (editableFactsEnabled) {
-    ensureEditableFactsBaseline(memoryDir, opts.summaryManager || null, {
-      seedFactsPath: path.join(memoryDir, "facts.md"),
-    });
-  }
-  const factsPath = editableFactsEnabled ? editableFactsPath(memoryDir) : path.join(memoryDir, "facts.md");
+  ensureEditableFactsBaseline(memoryDir, opts.summaryManager || null, {});
   return {
-    facts: normalizeCompiledSectionBody(safeReadFile(factsPath, "")),
+    facts: normalizeCompiledSectionBody(safeReadFile(path.join(memoryDir, "facts.md"), "")),
     today: normalizeCompiledSectionBody(safeReadFile(path.join(memoryDir, "today.md"), "")),
     week: normalizeCompiledSectionBody(safeReadFile(path.join(memoryDir, "week.md"), "")),
     longterm: normalizeCompiledSectionBody(safeReadFile(path.join(memoryDir, "longterm.md"), "")),
@@ -368,10 +291,8 @@ export function readCompiledMemorySections(memoryDir, opts: Record<string, any> 
 }
 
 export function writeEditableFactsSection(memoryDir, facts, opts: Record<string, any> = {}) {
-  ensureEditableFactsBaseline(memoryDir, opts.summaryManager || null, {
-    seedFactsPath: path.join(memoryDir, "facts.md"),
-  });
-  const targetPath = editableFactsPath(memoryDir);
+  ensureEditableFactsBaseline(memoryDir, opts.summaryManager || null, {});
+  const targetPath = path.join(memoryDir, "facts.md");
   const normalizedFacts = normalizeCompiledSectionBody(String(facts ?? ""));
   atomicWrite(targetPath, normalizedFacts ? `${normalizedFacts}\n` : "");
   assemble(
@@ -384,18 +305,28 @@ export function writeEditableFactsSection(memoryDir, facts, opts: Record<string,
   return normalizedFacts;
 }
 
+/**
+ * 确保 facts.md 存在，并在增量编译状态文件里补上首次水位线，避免把已经
+ * 沉淀过的旧摘要重新计入下一次 compileEditableFacts。
+ * facts.md 转正后，输出目标与继承来源是同一份文件，因此这里不再需要
+ * "从别的文件种子拷贝"这一步，只保留文件存在性兜底 + 水位线回填。
+ *
+ * 注意：这里不内嵌 migrateLegacyEditableFacts——本函数接受任意 outputPath
+ * （调用方可以传自定义路径用于测试/一次性场景），把迁移收在这里会在
+ * outputPath 不是规范 facts.md 时误伤。迁移改为在真正触达 facts.md 的入口显式
+ * 调用：memory-ticker 创建时、REST 路由 /memories/compiled 读写、
+ * update-settings-tool 的 memory.facts get/apply（见各调用点注释）。
+ */
 export function ensureEditableFactsBaseline(memoryDir, summaryManager = null, opts: Record<string, any> = {}) {
   fs.mkdirSync(memoryDir, { recursive: true });
-  const outputPath = opts.outputPath || editableFactsPath(memoryDir);
+  const outputPath = opts.outputPath || path.join(memoryDir, "facts.md");
   const statePath = opts.statePath || editableFactsStatePath(memoryDir);
-  const seedFactsPath = opts.seedFactsPath || path.join(memoryDir, "facts.md");
   const summaries = opts.summaries || getAllSummariesForFacts(summaryManager);
   const latestSummaryUpdatedAt = latestSummaryUpdate(summaries);
   let changed = false;
 
   if (!fs.existsSync(outputPath)) {
-    const seedFacts = normalizeCompiledSectionBody(safeReadFile(seedFactsPath, ""));
-    atomicWrite(outputPath, seedFacts);
+    atomicWrite(outputPath, "");
     changed = true;
   }
 
@@ -406,6 +337,85 @@ export function ensureEditableFactsBaseline(memoryDir, summaryManager = null, op
   }
 
   return { changed, latestSummaryUpdatedAt };
+}
+
+/**
+ * 一次性、幂等的读时迁移：把 alpha 阶段遗留的 editable-facts.md 并入
+ * 规范产物 facts.md。
+ *
+ * 三种现场：
+ *   1. 只有旧 facts.md（或都没有）：facts.md 已经是规范产物，不动。
+ *   2. 只有 editable-facts.md：直接更名为 facts.md。
+ *   3. 两者共存：以 editable-facts.md 为主体，把旧 facts.md 里未出现过的
+ *      条目（按行做宽松文本去重）并入末尾，写出新 facts.md；旧两份各自
+ *      留一份 .bak 快照。
+ *
+ * 幂等性：迁移完成后 editable-facts.md 会被移走（改名为 .bak 或删除），
+ * 所以重复调用会直接落到"只有 facts.md"分支，不会重复并入。
+ */
+export function migrateLegacyEditableFacts(memoryDir) {
+  const legacyEditablePath = path.join(memoryDir, "editable-facts.md");
+  const canonicalFactsPath = path.join(memoryDir, "facts.md");
+
+  if (!fs.existsSync(legacyEditablePath)) {
+    return { migrated: false, reason: "no-legacy-file" };
+  }
+
+  const editableContent = safeReadFile(legacyEditablePath, "");
+  const hasCanonical = fs.existsSync(canonicalFactsPath);
+  const canonicalContent = hasCanonical ? safeReadFile(canonicalFactsPath, "") : "";
+
+  const merged = hasCanonical
+    ? mergeFactsEntries(editableContent, canonicalContent)
+    : editableContent;
+
+  if (hasCanonical) {
+    atomicWrite(`${canonicalFactsPath}.bak`, canonicalContent);
+  }
+  atomicWrite(`${legacyEditablePath}.bak`, editableContent);
+  atomicWrite(canonicalFactsPath, merged);
+  removeFileIfExists(legacyEditablePath);
+
+  return { migrated: true, reason: hasCanonical ? "merged" : "renamed" };
+}
+
+/**
+ * 条目级（按行）去重合并：以 primary（editable-facts.md）为主体，
+ * 把 secondary（旧 facts.md）里未曾出现过的非空行追加到末尾。
+ * 语义判断从宽：trim 后的整行文本相等即视为重复，不调用 LLM。
+ */
+function mergeFactsEntries(primary, secondary) {
+  const primaryText = normalizeCompiledSectionBody(primary);
+  const secondaryText = normalizeCompiledSectionBody(secondary);
+  if (!secondaryText) return primaryText;
+  if (!primaryText) return secondaryText;
+
+  const seen = new Set(
+    primaryText.split(/\r?\n/).map((line) => normalizeFactLineForDedup(line)).filter(Boolean),
+  );
+  const extraLines = secondaryText
+    .split(/\r?\n/)
+    .filter((line) => {
+      const key = normalizeFactLineForDedup(line);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  if (extraLines.length === 0) return primaryText;
+  return [primaryText, ...extraLines].join("\n");
+}
+
+function normalizeFactLineForDedup(line) {
+  return String(line || "").trim().replace(/^[-*]\s+/, "").toLowerCase();
+}
+
+function removeFileIfExists(filePath) {
+  try {
+    fs.unlinkSync(filePath);
+  } catch (err) {
+    if (err?.code !== "ENOENT") throw err;
+  }
 }
 
 export async function compileEditableFacts(summaryManager, outputPath, resolvedModel, opts: Record<string, any> = {}) {

@@ -981,10 +981,6 @@
         "emptyPreview": "暂无观察结果",
         "clearObservation": "清除观察结果"
       },
-      "editableMemory": {
-        "title": "可编辑记忆",
-        "description": "打开后，当下记忆中的 Facts 会拆成可编辑区域；Agent 继续从时间线读取只读摘要。"
-      },
       "compaction": {
         "title": "压缩模式",
         "description": "自动会优先使用缓存保护压缩；普通压缩会放行 Pi SDK 原生摘要，更适合历史格式不稳定的会话。",
@@ -3134,8 +3130,7 @@
   "toolDef": {
     "updateSettings": {
       "memoryFacts": "记忆 Facts",
-      "memoryFactsDesc": "当前 Agent 的可编辑当下记忆 Facts。需要先打开「可编辑记忆」实验。",
-      "memoryFactsDisabled": "可编辑记忆实验尚未打开。"
+      "memoryFactsDesc": "当前 Agent 的可编辑当下记忆 Facts。"
     },
     "generateImage": {
       "description": "根据文字描述生成图片。非阻塞：提交后立即返回，完成后自动显示。",

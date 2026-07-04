@@ -7,8 +7,10 @@ vi.mock("../lib/memory/compile.js", () => ({
   compileToday: vi.fn().mockResolvedValue("compiled"),
   compileWeek: vi.fn().mockResolvedValue("compiled"),
   compileLongterm: vi.fn().mockResolvedValue("compiled"),
-  compileFacts: vi.fn().mockResolvedValue("compiled"),
+  compileEditableFacts: vi.fn().mockResolvedValue("compiled"),
   assemble: vi.fn(),
+  ensureEditableFactsBaseline: vi.fn(),
+  migrateLegacyEditableFacts: vi.fn(() => ({ migrated: false, reason: "no-legacy-file" })),
 }));
 
 vi.mock("../lib/memory/deep-memory.js", () => ({

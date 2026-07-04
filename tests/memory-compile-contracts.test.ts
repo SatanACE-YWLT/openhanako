@@ -26,7 +26,14 @@ vi.mock("../lib/i18n.js", () => ({
   getLocale: () => "zh-CN",
 }));
 
-import { compileToday, compileWeek, compileLongterm, compileFacts, compileEditableFacts, assemble } from "../lib/memory/compile.ts";
+import {
+  compileToday,
+  compileWeek,
+  compileLongterm,
+  compileEditableFacts,
+  assemble,
+  migrateLegacyEditableFacts,
+} from "../lib/memory/compile.ts";
 import {
   readCompiledResetAt,
   writeCompiledResetMarker,
@@ -238,16 +245,25 @@ describe("compiled section formatting", () => {
   it("compiles short facts updates instead of directly appending them", async () => {
     (callText as any).mockResolvedValueOnce("用户长期关注记忆系统。");
     const factsPath = path.join(tmpDir, "facts.md");
+    const statePath = path.join(tmpDir, "editable-facts-state.json");
     fs.writeFileSync(factsPath, "用户喜欢清晰边界。", "utf-8");
-    const mgr = makeFakeSummaryManager([
-      {
-        session_id: "s1",
-        updated_at: "2026-04-29T08:30:00.000Z",
-        summary: "## 重要事实\n用户长期关注记忆系统。\n\n## 事情经过\n无",
-      },
-    ]);
+    // 预先落一个早于本次摘要的水位线，确保新摘要不会被基线回填吞掉，
+    // 真正走到 LLM 合并这一步（compileEditableFacts 首次遇到未打过水位线的
+    // facts.md 会先回填水位线并直接返回 "compiled"，不调用 LLM）。
+    fs.writeFileSync(statePath, JSON.stringify({
+      lastCompiledSummaryUpdatedAt: "2026-04-28T00:00:00.000Z",
+    }), "utf-8");
+    const mgr = {
+      getAllSummaries: vi.fn(() => [
+        {
+          session_id: "s1",
+          updated_at: "2026-04-29T08:30:00.000Z",
+          summary: "## 重要事实\n用户长期关注记忆系统。\n\n## 事情经过\n无",
+        },
+      ]),
+    };
 
-    await compileFacts(mgr, factsPath, RESOLVED_MODEL);
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, { statePath });
 
     expect(callText).toHaveBeenCalledOnce();
     const request = (callText as any).mock.calls[0][0];
@@ -262,15 +278,22 @@ describe("compiled section formatting", () => {
   it("extracts facts from third-level rolling summary headings", async () => {
     (callText as any).mockResolvedValueOnce("用户长期关注记忆系统。");
     const factsPath = path.join(tmpDir, "facts.md");
-    const mgr = makeFakeSummaryManager([
-      {
-        session_id: "s1",
-        updated_at: "2026-04-29T08:30:00.000Z",
-        summary: "### 重要事实\n用户长期关注记忆系统。\n\n### 事情经过\n无",
-      },
-    ]);
+    const statePath = path.join(tmpDir, "editable-facts-state.json");
+    fs.writeFileSync(factsPath, "", "utf-8");
+    fs.writeFileSync(statePath, JSON.stringify({
+      lastCompiledSummaryUpdatedAt: "2026-04-28T00:00:00.000Z",
+    }), "utf-8");
+    const mgr = {
+      getAllSummaries: vi.fn(() => [
+        {
+          session_id: "s1",
+          updated_at: "2026-04-29T08:30:00.000Z",
+          summary: "### 重要事实\n用户长期关注记忆系统。\n\n### 事情经过\n无",
+        },
+      ]),
+    };
 
-    await compileFacts(mgr, factsPath, RESOLVED_MODEL);
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, { statePath });
 
     expect(callText).toHaveBeenCalledOnce();
     const request = (callText as any).mock.calls[0][0];
@@ -281,15 +304,22 @@ describe("compiled section formatting", () => {
   it("extracts facts from English rolling summary headings", async () => {
     (callText as any).mockResolvedValueOnce("The user is focused on memory systems.");
     const factsPath = path.join(tmpDir, "facts.md");
-    const mgr = makeFakeSummaryManager([
-      {
-        session_id: "s1",
-        updated_at: "2026-04-29T08:30:00.000Z",
-        summary: "### Key Facts\nThe user is focused on memory systems.\n\n### Timeline\nNone",
-      },
-    ]);
+    const statePath = path.join(tmpDir, "editable-facts-state.json");
+    fs.writeFileSync(factsPath, "", "utf-8");
+    fs.writeFileSync(statePath, JSON.stringify({
+      lastCompiledSummaryUpdatedAt: "2026-04-28T00:00:00.000Z",
+    }), "utf-8");
+    const mgr = {
+      getAllSummaries: vi.fn(() => [
+        {
+          session_id: "s1",
+          updated_at: "2026-04-29T08:30:00.000Z",
+          summary: "### Key Facts\nThe user is focused on memory systems.\n\n### Timeline\nNone",
+        },
+      ]),
+    };
 
-    await compileFacts(mgr, factsPath, RESOLVED_MODEL);
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, { statePath });
 
     expect(callText).toHaveBeenCalledOnce();
     const request = (callText as any).mock.calls[0][0];
@@ -297,13 +327,13 @@ describe("compiled section formatting", () => {
     expect(fs.readFileSync(factsPath, "utf-8")).toBe("The user is focused on memory systems.");
   });
 
-  it("seeds editable facts and records existing summaries as already processed", async () => {
+  it("seeds a fresh facts.md and records existing summaries as already processed", async () => {
     const memoryDir = path.join(tmpDir, "memory");
     fs.mkdirSync(memoryDir, { recursive: true });
+    // 全新 agent：facts.md 还不存在。首次调用应只建立基线（空文件 + 水位线
+    // 回填到最新摘要时间），不应把已经存在的旧摘要当成"新增候选"送进 LLM。
     const factsPath = path.join(memoryDir, "facts.md");
-    const editableFactsPath = path.join(memoryDir, "editable-facts.md");
     const statePath = path.join(memoryDir, "editable-facts-state.json");
-    fs.writeFileSync(factsPath, "用户喜欢清晰边界。", "utf-8");
     const mgr = {
       getAllSummaries: vi.fn(() => [
         {
@@ -314,13 +344,10 @@ describe("compiled section formatting", () => {
       ]),
     };
 
-    await compileEditableFacts(mgr, editableFactsPath, RESOLVED_MODEL, {
-      seedFactsPath: factsPath,
-      statePath,
-    });
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, { statePath });
 
     expect(callText).not.toHaveBeenCalled();
-    expect(fs.readFileSync(editableFactsPath, "utf-8")).toBe("用户喜欢清晰边界。");
+    expect(fs.readFileSync(factsPath, "utf-8")).toBe("");
     expect(JSON.parse(fs.readFileSync(statePath, "utf-8"))).toMatchObject({
       lastCompiledSummaryUpdatedAt: "2026-04-29T08:30:00.000Z",
     });
@@ -392,20 +419,27 @@ describe("compiled section formatting", () => {
 
   it("ignores unordered-list empty fact markers", async () => {
     const factsPath = path.join(tmpDir, "facts.md");
-    const mgr = makeFakeSummaryManager([
-      {
-        session_id: "s1",
-        updated_at: "2026-04-29T08:30:00.000Z",
-        summary: "### 重要事实\n- 无\n\n### 事情经过\n- 用户在讨论记忆系统。",
-      },
-      {
-        session_id: "s2",
-        updated_at: "2026-04-29T09:30:00.000Z",
-        summary: "### Key Facts\n- None\n\n### Timeline\n- The user discussed memory systems.",
-      },
-    ]);
+    const statePath = path.join(tmpDir, "editable-facts-state.json");
+    fs.writeFileSync(factsPath, "", "utf-8");
+    fs.writeFileSync(statePath, JSON.stringify({
+      lastCompiledSummaryUpdatedAt: "2026-04-28T00:00:00.000Z",
+    }), "utf-8");
+    const mgr = {
+      getAllSummaries: vi.fn(() => [
+        {
+          session_id: "s1",
+          updated_at: "2026-04-29T08:30:00.000Z",
+          summary: "### 重要事实\n- 无\n\n### 事情经过\n- 用户在讨论记忆系统。",
+        },
+        {
+          session_id: "s2",
+          updated_at: "2026-04-29T09:30:00.000Z",
+          summary: "### Key Facts\n- None\n\n### Timeline\n- The user discussed memory systems.",
+        },
+      ]),
+    };
 
-    await compileFacts(mgr, factsPath, RESOLVED_MODEL);
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, { statePath });
 
     expect(callText).not.toHaveBeenCalled();
     expect(fs.readFileSync(factsPath, "utf-8")).toBe("");
@@ -625,17 +659,139 @@ describe("compiled memory reset watermark filtering", () => {
     expect(mgr.getSummariesInRange.mock.calls[1][2]).toEqual({ since: "2026-04-29T08:00:00.000Z" });
   });
 
-  it("passes since to summary range queries for facts", async () => {
-    const mgr = makeFakeSummaryManager([
-      {
-        session_id: "new",
-        updated_at: "2026-04-29T08:30:00.000Z",
-        summary: "## 重要事实\n用户关注记忆系统。\n\n## 事情经过\n无",
-      },
-    ]);
+  it("respects the reset watermark (since) when compiling editable facts", async () => {
+    (callText as any).mockResolvedValueOnce("用户关注记忆系统。");
+    const factsPath = path.join(tmpDir, "facts.md");
+    const statePath = path.join(tmpDir, "editable-facts-state.json");
+    // facts.md 与增量编译状态文件都预先存在（水位线早于本次 reset），
+    // 确保基线回填分支不吞掉本次调用：opts.since（reset watermark）必须
+    // 独立生效，排除掉早于/等于它的旧摘要。
+    fs.writeFileSync(factsPath, "", "utf-8");
+    fs.writeFileSync(statePath, JSON.stringify({
+      lastCompiledSummaryUpdatedAt: "2026-04-20T00:00:00.000Z",
+    }), "utf-8");
+    const mgr = {
+      getAllSummaries: vi.fn(() => [
+        {
+          session_id: "before-reset",
+          updated_at: "2026-04-29T08:00:00.000Z",
+          summary: "## 重要事实\n不应被计入的旧摘要。\n\n## 事情经过\n无",
+        },
+        {
+          session_id: "after-reset",
+          updated_at: "2026-04-29T08:30:00.000Z",
+          summary: "## 重要事实\n用户关注记忆系统。\n\n## 事情经过\n无",
+        },
+      ]),
+    };
 
-    await compileFacts(mgr, path.join(tmpDir, "facts.md"), RESOLVED_MODEL, { since: "2026-04-29T08:00:00.000Z" });
+    await compileEditableFacts(mgr, factsPath, RESOLVED_MODEL, {
+      statePath,
+      since: "2026-04-29T08:00:00.000Z",
+    });
 
-    expect(mgr.getSummariesInRange.mock.calls[0][2]).toEqual({ since: "2026-04-29T08:00:00.000Z" });
+    expect(callText).toHaveBeenCalledOnce();
+    const request = (callText as any).mock.calls[0][0];
+    expect(request.messages[0].content).toContain("用户关注记忆系统。");
+    expect(request.messages[0].content).not.toContain("不应被计入的旧摘要");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Legacy editable-facts.md migration — one-time, idempotent read-time merge
+// ---------------------------------------------------------------------------
+
+describe("migrateLegacyEditableFacts", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-facts-migrate-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("does nothing when only the legacy facts.md exists (already canonical)", () => {
+    const factsPath = path.join(tmpDir, "facts.md");
+    fs.writeFileSync(factsPath, "用户喜欢清晰边界。", "utf-8");
+
+    const result = migrateLegacyEditableFacts(tmpDir);
+
+    expect(result).toMatchObject({ migrated: false, reason: "no-legacy-file" });
+    expect(fs.readFileSync(factsPath, "utf-8")).toBe("用户喜欢清晰边界。");
+    expect(fs.existsSync(path.join(tmpDir, "facts.md.bak"))).toBe(false);
+  });
+
+  it("does nothing when neither file exists", () => {
+    const result = migrateLegacyEditableFacts(tmpDir);
+
+    expect(result).toMatchObject({ migrated: false, reason: "no-legacy-file" });
+    expect(fs.existsSync(path.join(tmpDir, "facts.md"))).toBe(false);
+  });
+
+  it("renames editable-facts.md to facts.md when only the editable file exists", () => {
+    const editablePath = path.join(tmpDir, "editable-facts.md");
+    fs.writeFileSync(editablePath, "用户长期关注记忆系统。", "utf-8");
+
+    const result = migrateLegacyEditableFacts(tmpDir);
+
+    expect(result).toMatchObject({ migrated: true, reason: "renamed" });
+    expect(fs.readFileSync(path.join(tmpDir, "facts.md"), "utf-8")).toBe("用户长期关注记忆系统。");
+    expect(fs.existsSync(editablePath)).toBe(false);
+    expect(fs.readFileSync(`${editablePath}.bak`, "utf-8")).toBe("用户长期关注记忆系统。");
+  });
+
+  it("merges both files when they coexist, keeping editable-facts.md as the primary body", () => {
+    const factsPath = path.join(tmpDir, "facts.md");
+    const editablePath = path.join(tmpDir, "editable-facts.md");
+    fs.writeFileSync(factsPath, "用户喜欢清晰边界。\n用户长期关注记忆系统。", "utf-8");
+    fs.writeFileSync(editablePath, "用户长期关注记忆系统。\n用户最近在写论文。", "utf-8");
+
+    const result = migrateLegacyEditableFacts(tmpDir);
+
+    expect(result).toMatchObject({ migrated: true, reason: "merged" });
+    const merged = fs.readFileSync(factsPath, "utf-8");
+    // editable-facts.md 为主体，且在前
+    expect(merged.indexOf("用户长期关注记忆系统。")).toBeLessThan(merged.indexOf("用户喜欢清晰边界。"));
+    // 旧 facts.md 独有条目并入
+    expect(merged).toContain("用户喜欢清晰边界。");
+    // editable-facts.md 已有的条目
+    expect(merged).toContain("用户最近在写论文。");
+    // 两边都出现的条目不重复
+    expect(merged.split("用户长期关注记忆系统。").length - 1).toBe(1);
+
+    // 旧两份各留一份 .bak 快照
+    expect(fs.readFileSync(`${factsPath}.bak`, "utf-8")).toBe("用户喜欢清晰边界。\n用户长期关注记忆系统。");
+    expect(fs.readFileSync(`${editablePath}.bak`, "utf-8")).toBe("用户长期关注记忆系统。\n用户最近在写论文。");
+    expect(fs.existsSync(editablePath)).toBe(false);
+  });
+
+  it("is idempotent: re-running after a merge is a no-op", () => {
+    const factsPath = path.join(tmpDir, "facts.md");
+    const editablePath = path.join(tmpDir, "editable-facts.md");
+    fs.writeFileSync(factsPath, "用户喜欢清晰边界。", "utf-8");
+    fs.writeFileSync(editablePath, "用户长期关注记忆系统。", "utf-8");
+
+    const first = migrateLegacyEditableFacts(tmpDir);
+    expect(first.migrated).toBe(true);
+    const mergedAfterFirstRun = fs.readFileSync(factsPath, "utf-8");
+
+    const second = migrateLegacyEditableFacts(tmpDir);
+
+    expect(second).toMatchObject({ migrated: false, reason: "no-legacy-file" });
+    expect(fs.readFileSync(factsPath, "utf-8")).toBe(mergedAfterFirstRun);
+  });
+
+  it("is idempotent across repeated startups even with no legacy file ever present", () => {
+    const factsPath = path.join(tmpDir, "facts.md");
+    fs.writeFileSync(factsPath, "用户喜欢清晰边界。", "utf-8");
+
+    migrateLegacyEditableFacts(tmpDir);
+    migrateLegacyEditableFacts(tmpDir);
+    migrateLegacyEditableFacts(tmpDir);
+
+    expect(fs.readFileSync(factsPath, "utf-8")).toBe("用户喜欢清晰边界。");
   });
 });

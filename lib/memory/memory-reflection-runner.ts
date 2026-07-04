@@ -114,7 +114,7 @@ export async function runMemoryReflection({
   );
   let summary = scrub(activeTask.text.trim());
 
-  // 写入前结构校验 + 有限次数修复：摘要必须满足 compileFacts 的提取假设，
+  // 写入前结构校验 + 有限次数修复：摘要必须满足 compileEditableFacts 的提取假设，
   // 否则 facts 会在编译侧静默丢失（#1628）。空输出沿用"无变化"语义，不算违约。
   const repairUsageContext = buildRepairUsageContext(usageContext);
   let repairsUsed = 0;

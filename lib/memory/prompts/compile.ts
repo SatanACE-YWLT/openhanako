@@ -156,17 +156,6 @@ Do not output Markdown headings. Do not start with #, ##, or ###; output body te
   };
 }
 
-export function buildCompileFactsPrompt(locale = "zh-CN") {
-  const isZh = String(locale || "").startsWith("zh");
-  return {
-    templateVersion: "compile-facts.v1",
-    cacheGroup: "memory.compile.facts",
-    systemPrompt: isZh
-      ? "请综合「现有 Facts」和「新增候选 Facts」，重写成一份新的重要事实。必须控制在 200 字以内，宁可概括合并，也不要堆叠罗列。现有 Facts 是基础，但如果过长，必须压成更高层概括；新增候选 Facts 只在能纠正、补充或更新稳定用户画像时吸收。只保留稳定的、跨时间有效的用户画像：身份、人格特质、审美、兴趣、喜欢或讨厌的事物、长期关系、长期关注方向。矛盾时以新增候选 Facts 为准。不要追加，不要把两部分分别复述。不要保留工作方式、协作流程、工具偏好、执行细节。不要输出 Markdown 标题，不要以 #、##、### 开头；直接输出正文列表或段落。"
-      : "Synthesize \"Existing Facts\" and \"New Candidate Facts\", then rewrite them into one new Key Facts section. You must keep the result under 120 words; prefer concise abstraction and merging over stacked lists. Existing Facts are the base, but if they are too long, compress them into higher-level facts. Absorb New Candidate Facts only when they correct, supplement, or update stable user-profile information. Keep only stable, time-persistent user-profile facts: identity, personality traits, aesthetics, interests, likes/dislikes, long-term relationships, and long-term focus directions. When facts conflict, prefer New Candidate Facts. Do not append. Do not restate the two inputs separately. Do not keep work style, collaboration process, tool preferences, or execution details. Do not output Markdown headings. Do not start with #, ##, or ###; output body text only.",
-  };
-}
-
 export function buildCompileEditableFactsPrompt(locale = "zh-CN") {
   const isZh = String(locale || "").startsWith("zh");
   return {

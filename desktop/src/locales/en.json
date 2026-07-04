@@ -981,10 +981,6 @@
         "emptyPreview": "No observation yet",
         "clearObservation": "Clear observation"
       },
-      "editableMemory": {
-        "title": "Editable Memory",
-        "description": "When enabled, Facts in current memory are split into an editable area while the agent keeps reading timeline sections from read-only summaries."
-      },
       "compaction": {
         "title": "Compaction mode",
         "description": "Auto prefers cache-preserving compaction. Normal compaction lets Pi SDK run its native summarizer, which is better for unstable history formats.",
@@ -2878,8 +2874,7 @@
       "memory": "Memory System",
       "memoryDesc": "Enable/disable memory for current Agent",
       "memoryFacts": "Memory Facts",
-      "memoryFactsDesc": "Editable current-memory Facts for this Agent. Requires the Editable Memory experiment.",
-      "memoryFactsDisabled": "Editable Memory experiment is disabled.",
+      "memoryFactsDesc": "Editable current-memory Facts for this Agent.",
       "experience": "Experience",
       "experienceDesc": "Enable/disable the current Agent's experience library",
       "agentName": "Agent Name",

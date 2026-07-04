@@ -17,6 +17,7 @@ import {
 } from "../../lib/memory/compiled-memory-state.ts";
 import {
   buildCompiledMemoryMarkdown,
+  migrateLegacyEditableFacts,
   readCompiledMemorySections,
   writeEditableFactsSection,
 } from "../../lib/memory/compile.ts";
@@ -59,10 +60,6 @@ import {
 import { denySecretMutationWithoutScope, denyWithoutScope } from "../http/capability-guard.ts";
 import { recordSecurityAuditEvent } from "../http/security-audit.ts";
 import { readUserProfile, writeUserProfile } from "../../lib/user-profile-store.ts";
-import {
-  EDITABLE_MEMORY_EXPERIMENT_ID,
-  getResolvedExperimentValue,
-} from "../../lib/experiments/registry.ts";
 
 function hasOwn(value: any, key: string) {
   return !!value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key);
@@ -72,14 +69,6 @@ function hasProviderMutationPatch(partial: any) {
   if (!partial || typeof partial !== "object") return false;
   if (hasOwn(partial, "providers")) return true;
   return ["api", "embedding_api", "utility_api"].some((key) => hasInlineProviderCredentialPatch(partial[key]));
-}
-
-function isEditableMemoryEnabled(engine: any) {
-  try {
-    return getResolvedExperimentValue(engine.preferences, EDITABLE_MEMORY_EXPERIMENT_ID) === true;
-  } catch {
-    return false;
-  }
 }
 
 function getGlobalValue(globalFields: any[], key: string) {
@@ -613,15 +602,17 @@ export function createConfigRoute(engine: any) {
   route.get("/memories/compiled", async (c) => {
     try {
       const agent = resolveAgent(engine, c);
-      const editableFactsEnabled = isEditableMemoryEnabled(engine);
-      const sections = readCompiledMemorySections(path.dirname(agent.memoryMdPath), {
-        editableFactsEnabled,
+      const memDir = path.dirname(agent.memoryMdPath);
+      // 幂等：即使该 agent 从未跑起过 memoryTicker（未配置记忆模型），
+      // 首次读取也会把遗留的 editable-facts.md 并入规范的 facts.md。
+      migrateLegacyEditableFacts(memDir);
+      const sections = readCompiledMemorySections(memDir, {
         summaryManager: agent.summaryManager,
       });
-      const content = editableFactsEnabled
-        ? buildCompiledMemoryMarkdown(sections)
-        : await fs.readFile(agent.memoryMdPath, "utf-8").catch(() => "");
-      return c.json({ content, editableFactsEnabled, sections });
+      const content = buildCompiledMemoryMarkdown(sections);
+      // editableFactsEnabled 转正后恒为 true：facts 编辑能力不再受实验开关限制，
+      // 字段保留是为了不破坏前端既有契约（CompiledMemoryViewer 仍读取此字段）。
+      return c.json({ content, editableFactsEnabled: true, sections });
     } catch (err) {
       return c.json({ error: err.message }, 500);
     }
@@ -632,14 +623,12 @@ export function createConfigRoute(engine: any) {
       const denied = denyWithoutScope(c, "settings.write");
       if (denied) return denied;
       const agent = resolveAgentStrict(engine, c);
-      if (!isEditableMemoryEnabled(engine)) {
-        return c.json({ error: "editable memory experiment is disabled" }, 400);
-      }
       const body = await safeJson(c);
       if (typeof body?.facts !== "string") {
         return c.json({ error: "facts must be a string" }, 400);
       }
       const memDir = path.dirname(agent.memoryMdPath);
+      migrateLegacyEditableFacts(memDir);
       const normalizedFacts = writeEditableFactsSection(memDir, body.facts, {
         summaryManager: agent.summaryManager,
         memoryMdPath: agent.memoryMdPath,

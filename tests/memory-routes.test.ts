@@ -166,45 +166,39 @@ describe("memory routes", () => {
     expect(agent.memoryTicker.getHealthStatus).not.toHaveBeenCalled();
   });
 
-  it("returns compiled memory sections with editable facts when the experiment is enabled", async () => {
+  it("returns compiled memory sections reading facts.md as the canonical facts source", async () => {
     const agent = makeAgent(tmpDir);
     const memoryDir = path.dirname(agent.memoryMdPath);
-    fs.writeFileSync(path.join(memoryDir, "facts.md"), "legacy facts", "utf-8");
-    fs.writeFileSync(path.join(memoryDir, "editable-facts.md"), "editable facts", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "facts.md"), "current facts", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "today.md"), "today part", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "week.md"), "week part", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "longterm.md"), "longterm part", "utf-8");
     const engine = makeEngine(agent, tmpDir);
-    engine.preferences.getExperimentValue = vi.fn((id) => (
-      id === "memory.editable_facts" ? true : undefined
-    ));
     const app = mountConfigRoute(engine);
 
     const res = await app.request("/api/memories/compiled?agentId=hana");
     const data = await res.json();
 
     expect(res.status).toBe(200);
+    // facts 转正后恒为 true：字段保留只为兼容前端既有契约，不再受任何实验开关影响。
     expect(data.editableFactsEnabled).toBe(true);
     expect(data.sections).toMatchObject({
-      facts: "editable facts",
+      facts: "current facts",
       today: "today part",
       week: "week part",
       longterm: "longterm part",
     });
-    expect(data.content).toContain("## 重要事实\n\neditable facts");
+    expect(data.content).toContain("## 重要事实\n\ncurrent facts");
   });
 
-  it("saves editable facts and rebuilds compiled memory when the experiment is enabled", async () => {
+  it("saves edited facts straight to facts.md and rebuilds compiled memory", async () => {
     const agent = makeAgent(tmpDir);
     const memoryDir = path.dirname(agent.memoryMdPath);
-    fs.writeFileSync(path.join(memoryDir, "facts.md"), "legacy facts", "utf-8");
+    fs.writeFileSync(path.join(memoryDir, "facts.md"), "old facts", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "today.md"), "today part", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "week.md"), "week part", "utf-8");
     fs.writeFileSync(path.join(memoryDir, "longterm.md"), "longterm part", "utf-8");
     const engine = makeEngine(agent, tmpDir);
-    engine.preferences.getExperimentValue = vi.fn((id) => (
-      id === "memory.editable_facts" ? true : undefined
-    ));
     const app = mountConfigRoute(engine);
 
     const res = await app.request("/api/memories/compiled/facts?agentId=hana", {
@@ -216,8 +210,7 @@ describe("memory routes", () => {
 
     expect(res.status).toBe(200);
     expect(data.ok).toBe(true);
-    expect(fs.readFileSync(path.join(memoryDir, "editable-facts.md"), "utf-8")).toBe("edited facts\n");
-    expect(fs.readFileSync(path.join(memoryDir, "facts.md"), "utf-8")).toBe("legacy facts");
+    expect(fs.readFileSync(path.join(memoryDir, "facts.md"), "utf-8")).toBe("edited facts\n");
     const memoryMd = fs.readFileSync(agent.memoryMdPath, "utf-8");
     expect(memoryMd).toContain("## 重要事实\n\nedited facts");
     expect(memoryMd).toContain("## 今天\n\ntoday part");
