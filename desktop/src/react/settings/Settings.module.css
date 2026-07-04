@@ -5,6 +5,7 @@
 :global(.settings-panel) {
     --settings-nav-width: 180px;
     --paper-texture-attachment: scroll;
+    position: relative;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -6188,6 +6189,14 @@ a.about-link:hover {
     overflow: hidden;
 }
 
+.compiled-memory-viewer-backdrop {
+    padding: var(--space-40) var(--space-24);
+}
+
+.compiled-memory-viewer {
+    max-height: 100%;
+}
+
 .memory-viewer-header {
     display: flex;
     align-items: center;
@@ -6275,18 +6284,6 @@ a.about-link:hover {
 
 .compiled-edit-toggle-btn:hover {
     opacity: 1;
-}
-
-.compiled-edit-save-btn {
-    color: var(--button-text);
-    background: var(--accent);
-    border-color: var(--accent);
-    opacity: 1;
-}
-
-.compiled-edit-save-btn:hover {
-    background: var(--accent-hover, var(--accent));
-    border-color: var(--accent-hover, var(--accent));
 }
 
 .compiled-clear-btn:disabled,

@@ -208,15 +208,16 @@ export function CompiledMemoryViewer() {
       onClose={close}
       backdrop="blur"
       zIndex={100}
-      className={styles['memory-viewer']}
-      backdropClassName={styles['memory-viewer-backdrop']}
+      className={`${styles['memory-viewer']} ${styles['compiled-memory-viewer']}`}
+      backdropClassName={`${styles['memory-viewer-backdrop']} ${styles['compiled-memory-viewer-backdrop']}`}
+      contained
       disableContainerAnimation
     >
         <div className={styles['memory-viewer-header']}>
           <h3 className={styles['memory-viewer-title']}>{t('settings.memory.compiled')}</h3>
           <div className={styles['memory-viewer-header-actions']}>
             <button
-              className={`${styles['compiled-edit-toggle-btn']} ${editing ? styles['compiled-edit-save-btn'] : ''}`}
+              className={styles['compiled-edit-toggle-btn']}
               onClick={handlePrimaryAction}
               disabled={loading || savingAll}
             >

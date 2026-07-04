@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(new URL('../../settings/Settings.module.css', import.meta.url), 'utf8');
 const modalCss = readFileSync(new URL('../../components/SettingsModalShell.module.css', import.meta.url), 'utf8');
+const overlayCss = readFileSync(new URL('../../ui/Overlay.module.css', import.meta.url), 'utf8');
 
 function cssRule(source: string, selector: string) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -12,12 +13,21 @@ function cssRule(source: string, selector: string) {
 
 describe('memory viewer layout contract', () => {
   it('keeps long memory content inside a scrollable body', () => {
+    expect(cssRule(css, ':global(.settings-panel)')).toMatch(/position:\s*relative;/);
+
     expect(cssRule(css, '.memory-viewer-backdrop')).toMatch(/padding:\s*var\(--space-16\);/);
-    expect(cssRule(css, '.memory-viewer')).toMatch(
-      /max-height:\s*min\(760px,\s*calc\(100vh - var\(--space-40\) - var\(--space-40\)\)\);/
-    );
+    expect(cssRule(css, '.compiled-memory-viewer-backdrop')).toMatch(/padding:\s*var\(--space-40\) var\(--space-24\);/);
+    expect(cssRule(css, '.compiled-memory-viewer')).toMatch(/max-height:\s*100%;/);
     expect(cssRule(css, '.memory-viewer')).toMatch(/min-height:\s*0;/);
     expect(cssRule(css, '.memory-viewer')).toMatch(/overflow:\s*hidden;/);
+
+    expect(cssRule(overlayCss, '.contained-backdrop')).toMatch(/position:\s*absolute;/);
+    expect(cssRule(overlayCss, '.contained-container')).toMatch(/max-height:\s*100%;/);
+    expect(cssRule(overlayCss, '.contained-container')).toMatch(/min-height:\s*0;/);
+
+    expect(cssRule(css, '.compiled-edit-toggle-btn')).toMatch(/background:\s*none;/);
+    expect(cssRule(css, '.compiled-edit-toggle-btn')).toMatch(/border:\s*1px solid var\(--overlay-light\);/);
+    expect(cssRule(css, '.compiled-edit-save-btn')).toBe('');
 
     expect(cssRule(css, '.memory-viewer-body')).toMatch(/flex:\s*1 1 auto;/);
     expect(cssRule(css, '.memory-viewer-body')).toMatch(/min-height:\s*0;/);
