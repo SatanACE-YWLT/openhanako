@@ -418,13 +418,18 @@ export interface BrowserViewerUpdate {
   tabs?: BrowserViewerTab[];
 }
 
+export interface BrowserViewerOpenTarget {
+  url?: string | null;
+  sessionPath?: string | null;
+}
+
 // ── Platform API 类型声明 ──
 export interface PlatformApi {
   getServerPort(): Promise<string>;
   getServerToken(): Promise<string>;
   runEditCommand?(command: 'cut' | 'copy' | 'paste' | 'selectAll'): Promise<boolean>;
   openSettings(tab?: string): void;
-  openBrowserViewer(url?: string, theme?: string): void;
+  openBrowserViewer(target?: string | BrowserViewerOpenTarget): void;
   selectFolder(): Promise<string | null>;
   selectFiles(): Promise<string[]>;
   selectSkill(): Promise<string | null>;
@@ -459,7 +464,7 @@ export interface PlatformApi {
   openExternal(url: string): void;
   showInFinder(path: string): void;
   trashItem?(path: string): Promise<boolean>;
-  browserEmergencyStop?(): void;
+  browserEmergencyStop?(sessionPath?: string | null): void;
   openSkillViewer?(opts: { skillPath?: string; name?: string; baseDir?: string; filePath?: string; installed?: boolean }): void;
   settingsChanged(event: string, payload?: unknown): void;
   syncWindowTheme?(theme: string): void;
@@ -483,12 +488,12 @@ export interface PlatformApi {
   onBrowserUpdate?(callback: (data: BrowserViewerUpdate) => void): void | (() => void);
   closeBrowserViewer?(): void;
   closeBrowser?(): void;
-  browserGoBack?(): void;
-  browserGoForward?(): void;
-  browserReload?(): void;
-  browserNewTab?(): void;
-  browserSwitchTab?(tabId: string): void;
-  browserCloseTab?(tabId: string): void;
+  browserGoBack?(sessionPath?: string | null): void;
+  browserGoForward?(sessionPath?: string | null): void;
+  browserReload?(sessionPath?: string | null): void;
+  browserNewTab?(sessionPath?: string | null): void;
+  browserSwitchTab?(tabId: string, sessionPath?: string | null): void;
+  browserCloseTab?(tabId: string, sessionPath?: string | null): void;
 
   // ── Skill viewer (preload) ──
   listSkillFiles?(baseDir: string): Promise<unknown[]>;
