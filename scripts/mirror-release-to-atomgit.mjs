@@ -1,10 +1,10 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_GITHUB_REPOSITORY = "liliMozi/openhanako";
 const DEFAULT_ATOMGIT_OWNER = "liliMozi";
@@ -260,7 +260,7 @@ export async function run(argv = process.argv.slice(2), { env = process.env, fet
   console.log(JSON.stringify({ mirrored: summaries }, null, 2));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   run().catch((error) => {
     console.error(error?.stack || error?.message || String(error));
     process.exit(1);

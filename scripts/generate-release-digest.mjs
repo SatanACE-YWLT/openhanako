@@ -1,8 +1,8 @@
-#!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import {
   DIGEST_ASSET_NAME,
   DIGEST_SCHEMA_VERSION,
@@ -279,7 +279,7 @@ export async function run(argv = process.argv.slice(2), { env = process.env, fet
   console.log(`Wrote ${args.out} for ${digest.tag}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   run().catch((error) => {
     console.error(error?.stack || error?.message || String(error));
     process.exit(1);

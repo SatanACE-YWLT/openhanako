@@ -1,6 +1,6 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 import { DIGEST_ASSET_NAME, assertValidReleaseDigest } from "./release-digest-schema.mjs";
 
 function parseArgs(argv = process.argv.slice(2), env = process.env) {
@@ -67,7 +67,7 @@ export function run(argv = process.argv.slice(2), env = process.env) {
   console.log(`Validated ${args.file} for ${args.tag}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   try {
     run();
   } catch (error) {
