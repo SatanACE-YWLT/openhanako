@@ -42,6 +42,40 @@ describe("install_skill safety review", () => {
     expect((callText as any).mock.calls[0][0]).not.toHaveProperty("maxTokens");
   });
 
+  it("uses a small-utility-only resolver for install skill safety review", async () => {
+    (callText as any).mockResolvedValueOnce("safe");
+    const resolveUtilityConfig = vi.fn((options) => {
+      expect(options).toMatchObject({
+        requireUtilityLarge: false,
+        purpose: "install_skill_safety",
+      });
+      return {
+        utility: "utility-model",
+        api_key: "key",
+        base_url: "https://example.test",
+        api: "openai",
+      };
+    });
+
+    const result = await safetyReview("---\nname: demo\n---\n# Demo\n", resolveUtilityConfig);
+
+    expect(result).toEqual({ safe: true });
+    expect(resolveUtilityConfig).toHaveBeenCalledOnce();
+    expect(callText).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Agent and AgentManager resolver wrappers option-aware for install_skill", () => {
+    const agentSource = fs.readFileSync(path.join(process.cwd(), "core", "agent.ts"), "utf-8");
+    const managerSource = fs.readFileSync(path.join(process.cwd(), "core", "agent-manager.ts"), "utf-8");
+
+    expect(agentSource).toContain(
+      "resolveUtilityConfig: (options) => this._cb?.resolveUtilityConfig?.(options)",
+    );
+    expect(managerSource).toContain(
+      "resolveUtilityConfig: (options) => getEngine()?.resolveUtilityConfig?.({ ...(options || {}), agentId: ag.id })",
+    );
+  });
+
   it("returns a soft confirmation gate when safety review fails", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-install-skill-safety-"));
     const sourceDir = path.join(tmpDir, "source");

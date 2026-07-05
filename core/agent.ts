@@ -575,7 +575,7 @@ export class Agent {
         cfg.capabilities = { ...cfg.capabilities, learn_skills: globalLearn };
         return cfg;
       },
-      resolveUtilityConfig: () => this._cb?.resolveUtilityConfig?.(),
+      resolveUtilityConfig: (options) => this._cb?.resolveUtilityConfig?.(options),
       onInstalled: async (skillName) => {
         await this._onInstallCallback?.(skillName);
       },

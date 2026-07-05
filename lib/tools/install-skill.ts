@@ -71,6 +71,14 @@ function parseGithubUrl(url: any) {
  * 通过 utility model 做安全审查
  * 返回 { safe: boolean, reason?: string }
  */
+function resolveSafetyReviewUtilityConfig(resolveUtilityConfig: any) {
+  if (typeof resolveUtilityConfig !== "function") return null;
+  return resolveUtilityConfig({
+    requireUtilityLarge: false,
+    purpose: "install_skill_safety",
+  });
+}
+
 export async function safetyReview(skillContent: any, resolveUtilityConfig: any) {
   const isZh = getLocale().startsWith("zh");
 
@@ -81,9 +89,9 @@ export async function safetyReview(skillContent: any, resolveUtilityConfig: any)
 
   let utilCfg;
   try {
-    utilCfg = resolveUtilityConfig();
-  } catch {
-    return { safe: false, reason: t("error.installSkillNoUtility") };
+    utilCfg = resolveSafetyReviewUtilityConfig(resolveUtilityConfig);
+  } catch (err) {
+    return { safe: false, reason: err instanceof Error && err.message ? err.message : t("error.installSkillNoUtility") };
   }
   if (!utilCfg) {
     return { safe: false, reason: t("error.installSkillNoUtility") };
