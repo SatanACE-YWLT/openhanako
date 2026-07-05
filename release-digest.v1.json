@@ -1,204 +1,78 @@
 {
   "schemaVersion": 1,
-  "tag": "v0.357.8",
-  "version": "0.357.8",
-  "previousTag": "v0.351.5",
-  "generatedAt": "2026-07-05T10:37:00.000Z",
+  "tag": "v0.357.13",
+  "version": "0.357.13",
+  "previousTag": "v0.357.8",
+  "generatedAt": "2026-07-05T19:10:00.000Z",
   "noUserFacingChanges": false,
   "summary": {
-    "zh": "记忆编辑与更新体验大幅增强，聊天与设置界面也更稳更顺。",
-    "en": "Memory editing and update delivery are much stronger, with smoother chat and settings polish."
+    "zh": "多语言界面更完整，定时任务更可靠，国内用户也能从 AtomGit 镜像收到更新。",
+    "en": "Broader locale coverage, more reliable scheduled tasks, and AtomGit mirror delivery for users in China."
   },
   "counts": {
-    "feature": 4,
-    "fix": 6,
-    "improvement": 2,
+    "feature": 1,
+    "fix": 1,
+    "improvement": 1,
     "migration": 0
   },
   "source": {
     "owner": "liliMozi",
     "repo": "openhanako",
-    "commitRange": "v0.351.5..ec98c08fe",
-    "releaseUrl": "https://github.com/liliMozi/openhanako/releases/tag/v0.357.8",
+    "commitRange": "v0.357.8..0c1170027",
+    "releaseUrl": "https://github.com/liliMozi/openhanako/releases/tag/v0.357.13",
     "releaseNotes": ""
   },
   "items": [
     {
-      "id": "memory-editor",
+      "id": "atomgit-release-mirror",
       "kind": "feature",
       "importance": "high",
       "title": {
-        "zh": "四段式记忆编辑器",
-        "en": "Four-section memory editor"
+        "zh": "AtomGit 发布镜像",
+        "en": "AtomGit release mirror"
       },
       "summary": {
-        "zh": "可在设置里按天编辑 compiled memory，Facts 也进入正式写入链路。",
-        "en": "Edit compiled memory by day in Settings, with Facts promoted into the canonical write path."
+        "zh": "正式版构建完成后会自动同步到 AtomGit 发布仓库，自动更新优先走国内镜像。",
+        "en": "Release builds now sync to the AtomGit release repo so in-app updates can prefer the domestic mirror."
       },
       "details": [],
       "sources": [
-        { "type": "commit", "ref": "f694dc5e3", "title": "feat: add a four-section memory editor with per-day week entries" },
-        { "type": "commit", "ref": "34cd186b0", "title": "feat: promote editable facts memory to the canonical facts pipeline" }
+        { "type": "commit", "ref": "5973592e4", "title": "feat: mirror releases to atomgit after build" },
+        { "type": "commit", "ref": "bcc3640e8", "title": "fix: target normal atomgit release repo" }
       ]
     },
     {
-      "id": "memory-compilation",
-      "kind": "feature",
-      "importance": "high",
-      "title": {
-        "zh": "增量记忆编译",
-        "en": "Incremental memory compilation"
-      },
-      "summary": {
-        "zh": "今日记忆改为增量编译，周记忆由滚动日摘要驱动，减少重复重算。",
-        "en": "Today memory compiles incrementally, and weekly memory rolls forward from daily digests instead of full recompiles."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "c79d59d43", "title": "feat: make today memory compilation incremental with a summary watermark" },
-        { "type": "commit", "ref": "060b0bc2b", "title": "feat: replace weekly memory recompilation with a rolling daily digest conveyor" }
-      ]
-    },
-    {
-      "id": "update-digest",
-      "kind": "feature",
-      "importance": "high",
-      "title": {
-        "zh": "更新摘要与镜像更新",
-        "en": "Update digest and mirror updates"
-      },
-      "summary": {
-        "zh": "About 页可查看双语更新摘要；应用优先从 AtomGit 检查更新，GitHub 作备用源。",
-        "en": "The About page shows bilingual update digests; the app prefers AtomGit for updates with GitHub as fallback."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "d2636b382", "title": "feat: add release digest and atomgit mirror flow" },
-        { "type": "commit", "ref": "60afb7141", "title": "feat: prefer atomgit updater with github fallback" }
-      ]
-    },
-    {
-      "id": "chat-ux",
-      "kind": "fix",
-      "importance": "medium",
-      "title": {
-        "zh": "聊天交互更稳",
-        "en": "Steadier chat interactions"
-      },
-      "summary": {
-        "zh": "流式回复时可选中文字，工具输出折叠不再跳滚动，多选时仍可用消息底部操作。",
-        "en": "Select text while streaming, keep scroll stable when collapsing tool output, and use footer actions during selection."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "8dd5112c0", "title": "fix: keep transcript text selectable while the assistant is streaming" },
-        { "type": "commit", "ref": "93e0566de", "title": "fix: keep scroll position stable when tool output collapses" },
-        { "type": "commit", "ref": "02467361f", "title": "fix: allow message footer actions during selection" }
-      ]
-    },
-    {
-      "id": "browser-session",
-      "kind": "fix",
-      "importance": "medium",
-      "title": {
-        "zh": "浏览器视图按会话隔离",
-        "en": "Browser viewer isolated per session"
-      },
-      "summary": {
-        "zh": "切换会话时不再共用同一个浏览器视图，避免上下文串线。",
-        "en": "Each session keeps its own browser viewer so switching chats no longer mixes context."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "de5a77239", "title": "fix: isolate browser viewer per session" }
-      ]
-    },
-    {
-      "id": "input-toolbar",
+      "id": "locale-parity",
       "kind": "improvement",
-      "importance": "medium",
+      "importance": "high",
       "title": {
-        "zh": "输入栏指示更简洁",
-        "en": "Cleaner input toolbar indicators"
+        "zh": "多语言界面补全",
+        "en": "Locale parity across the UI"
       },
       "summary": {
-        "zh": "模型、权限与上下文指示器布局更干净，上下文圆环不再显示数字标签。",
-        "en": "Model, permission, and context indicators are cleaner, and the context ring hides its numeric label."
+        "zh": "日语、韩语、繁体中文补齐主要界面文案，聊天、输入框和设置里的硬编码文字也改走翻译。",
+        "en": "Japanese, Korean, and Traditional Chinese now cover the main UI, with chat, input, and settings strings routed through i18n."
       },
       "details": [],
       "sources": [
-        { "type": "commit", "ref": "05691b507", "title": "fix: simplify input toolbar model, permission, and context indicators" },
-        { "type": "commit", "ref": "8f8710443", "title": "fix: remove double border on agent model selector capsule" }
+        { "type": "commit", "ref": "9bdb96621", "title": "fix(i18n): backfill locale parity and replace hardcoded UI strings" }
       ]
     },
     {
-      "id": "first-prompt",
+      "id": "cron-next-run",
       "kind": "fix",
       "importance": "medium",
       "title": {
-        "zh": "首条消息更可靠",
-        "en": "More reliable first prompt"
+        "zh": "定时任务调度更准",
+        "en": "More reliable cron scheduling"
       },
       "summary": {
-        "zh": "发送第一条消息前会预创建 pending session，减少冷启动时的空窗。",
-        "en": "Pending sessions are pre-created before the first prompt, reducing cold-start gaps."
+        "zh": "修复下次运行时间的游标计算，Studio 定时任务不再漏跑或重复触发。",
+        "en": "Fixes next-run cursor calculation so Studio scheduled tasks fire on time without duplicate triggers."
       },
       "details": [],
       "sources": [
-        { "type": "commit", "ref": "c1ae0cfb5", "title": "fix: precreate pending sessions for first prompt" }
-      ]
-    },
-    {
-      "id": "memory-settings",
-      "kind": "fix",
-      "importance": "low",
-      "title": {
-        "zh": "记忆设置更集中",
-        "en": "Memory settings stay in panel"
-      },
-      "summary": {
-        "zh": "记忆查看器限定在设置面板内，编辑与保存权限分类更准确。",
-        "en": "The memory viewer stays inside Settings, with clearer scope classification for saves."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "ae644cbac", "title": "fix: constrain memory viewer to settings panel" },
-        { "type": "commit", "ref": "1ba5d8d5a", "title": "fix: classify facts memory save under the settings.write scope" }
-      ]
-    },
-    {
-      "id": "transcript-avatar",
-      "kind": "fix",
-      "importance": "low",
-      "title": {
-        "zh": "对话头像更完整",
-        "en": "Fuller transcript avatars"
-      },
-      "summary": {
-        "zh": "聊天记录行保留完整的 agent 头像身份信息。",
-        "en": "Transcript rows preserve the full agent avatar identity."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "9b739825f", "title": "fix: preserve full agent avatar identity in transcript rows" }
-      ]
-    },
-    {
-      "id": "chat-performance",
-      "kind": "improvement",
-      "importance": "low",
-      "title": {
-        "zh": "聊天列表更轻量",
-        "en": "Lighter chat list rendering"
-      },
-      "summary": {
-        "zh": "消息组件的 store 订阅下沉到行级，长对话滚动更顺。",
-        "en": "Per-row store subscriptions reduce overhead for smoother scrolling in long chats."
-      },
-      "details": [],
-      "sources": [
-        { "type": "commit", "ref": "5d8a6b569", "title": "perf: hoist per-row store subscriptions out of chat message components" },
-        { "type": "commit", "ref": "acec482e1", "title": "fix: guard chat timeline navigator against resize-observer update loops" }
+        { "type": "commit", "ref": "9e089f792", "title": "fix: repair cron next run cursor" }
       ]
     }
   ]
