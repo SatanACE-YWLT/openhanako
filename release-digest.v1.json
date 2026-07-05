@@ -1,73 +1,60 @@
 {
   "schemaVersion": 1,
-  "tag": "v0.357.14",
-  "version": "0.357.14",
-  "previousTag": "v0.357.13",
-  "generatedAt": "2026-07-05T20:21:08.000Z",
+  "tag": "v0.357.16",
+  "version": "0.357.16",
+  "previousTag": "v0.357.14",
+  "generatedAt": "2026-07-05T23:05:00.000Z",
   "noUserFacingChanges": false,
   "summary": {
-    "zh": "国内更新镜像更可靠，AtomGit/GitCode 附件上传会正确保留签名头，并在重跑时安全跳过已同步文件。",
-    "en": "Domestic update mirroring is more reliable: AtomGit/GitCode asset uploads now preserve signed headers and safely skip files that are already mirrored."
+    "zh": "会话列表不再出现空白占位，聊天里也能看清命令工具具体做了什么。",
+    "en": "Session lists no longer show empty placeholders, and command tool calls are easier to read in chat."
   },
   "counts": {
     "feature": 0,
-    "fix": 1,
-    "improvement": 1,
+    "fix": 2,
+    "improvement": 0,
     "migration": 0
   },
   "source": {
     "owner": "liliMozi",
     "repo": "openhanako",
-    "commitRange": "v0.357.13..HEAD",
-    "releaseUrl": "https://github.com/liliMozi/openhanako/releases/tag/v0.357.14",
+    "commitRange": "v0.357.14..24f31cd3f",
+    "releaseUrl": "https://github.com/liliMozi/openhanako/releases/tag/v0.357.16",
     "releaseNotes": ""
   },
   "items": [
     {
-      "id": "atomgit-asset-upload-repair",
+      "id": "session-list-placeholders",
       "kind": "fix",
-      "importance": "high",
-      "title": {
-        "zh": "修复 AtomGit 附件上传",
-        "en": "Fixed AtomGit asset uploads"
-      },
-      "summary": {
-        "zh": "发布镜像会按 GitCode 返回的签名上传要求发送安装包，避免国内镜像缺少安装附件。",
-        "en": "Release mirroring now sends installers with the signed upload headers returned by GitCode, preventing missing installer assets on the domestic mirror."
-      },
-      "details": [
-        {
-          "zh": "上传请求改为一次性字节上传，并保留对象存储签名绑定的 Content-Type。",
-          "en": "Uploads now use buffered bytes and preserve the Content-Type bound to the object-storage signature."
-        }
-      ],
-      "sources": [
-        {
-          "type": "commit",
-          "ref": "cd8bc91d3cb9",
-          "title": "fix: upload atomgit release assets as buffered puts"
-        }
-      ]
-    },
-    {
-      "id": "atomgit-mirror-rerun-safety",
-      "kind": "improvement",
       "importance": "medium",
       "title": {
-        "zh": "镜像重跑更安全",
-        "en": "Safer mirror reruns"
+        "zh": "会话列表不再空白占位",
+        "en": "No more empty session placeholders"
       },
       "summary": {
-        "zh": "如果同名附件已经在 AtomGit 上存在，脚本会先校验大小，相同才跳过，避免重复上传或静默覆盖不一致文件。",
-        "en": "When an asset already exists on AtomGit, the script verifies its size before skipping it, avoiding duplicate uploads or silent mismatches."
+        "zh": "修复新建或切换会话时侧边栏出现空白条目的问题，列表只显示真实会话。",
+        "en": "Fixes blank sidebar rows when creating or switching sessions so the list only shows real conversations."
       },
       "details": [],
       "sources": [
-        {
-          "type": "commit",
-          "ref": "cd8bc91d3cb9",
-          "title": "fix: upload atomgit release assets as buffered puts"
-        }
+        { "type": "commit", "ref": "7fed5cdbe", "title": "fix: avoid empty session placeholders" }
+      ]
+    },
+    {
+      "id": "command-tool-details",
+      "kind": "fix",
+      "importance": "medium",
+      "title": {
+        "zh": "命令工具过程更清晰",
+        "en": "Clearer command tool progress"
+      },
+      "summary": {
+        "zh": "聊天流里展示命令工具调用的关键参数摘要，方便跟进 Agent 正在执行什么。",
+        "en": "Chat now shows concise argument summaries for command tool invocations so you can follow what the agent is running."
+      },
+      "details": [],
+      "sources": [
+        { "type": "commit", "ref": "24f31cd3f", "title": "fix: show command tool invocation details" }
       ]
     }
   ]
