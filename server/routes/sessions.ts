@@ -69,6 +69,7 @@ import { replayLatestUserTurn } from "../../core/session-turn-actions.ts";
 import { createRequestContext } from "../http/boundary.ts";
 import { createModuleLogger } from "../../lib/debug-log.ts";
 import { searchSessions } from "../../lib/search/session-search.ts";
+import { findInSessionMessages } from "../../lib/search/session-find.ts";
 import { SessionSearchTokenizerUnavailableError } from "../../lib/search/session-search-tokenizer.ts";
 import { MountAwareFileError, MountAwareFileService } from "../../core/mount-aware-file-service.ts";
 import { isAssistantCommentaryTextBlock } from "../../shared/text-signature.ts";
@@ -248,6 +249,47 @@ function isDisplayableHistoryMessage(message) {
       || hasToolUseContent(message.content);
   }
   return false;
+}
+
+// 与 /sessions/messages 主循环的序号语义逐字对齐：
+// 只有 user/assistant 且 isDisplayableHistoryMessage 为真的消息推进 displayIdx。
+// 改这里必须同步改 messages 主循环与 tests/session-find-route.test.ts 的一致性测试。
+const FIND_HIDDEN_USER_MESSAGE_RE = /<hana-background-result\s|<hana-deferred-tasks>/;
+const FIND_LEGACY_STEER_PREFIX_RE = /^(?:（插话，无需 MOOD）|\(Interjection, no MOOD needed\))\n?/;
+const FIND_TURN_TAG_PREFIX_RE = /^<t>[^<]*<\/t>\s*/;
+
+// find 路由的热路径缓存：key 为 sessionPath，value 为 { revision, entries }。
+// revision（stat 签名，与 /api/sessions 列表投影同源同格式）不一致即失效；
+// revision 为 null（修订未知）时不写缓存，防止把"未知"固化成陈旧命中。
+// 容量上限 FIND_ENTRIES_CACHE_MAX，超限时按插入序淘汰最早的 key。
+const FIND_ENTRIES_CACHE_MAX = 8;
+const findEntriesCache = new Map();
+
+export function collectFindableHistoryEntries(sourceMessages, sanitizeVisibleContent) {
+  const entries = [];
+  let displayIdx = 0;
+  for (const m of Array.isArray(sourceMessages) ? sourceMessages : []) {
+    if (m?.role !== "user" && m?.role !== "assistant") continue;
+    if (!isDisplayableHistoryMessage(m)) continue;
+    const currentIndex = displayIdx;
+    displayIdx += 1;
+    if (m.role === "user") {
+      const { text } = extractTextContent(m.content);
+      const content = sanitizeVisibleContent(text);
+      // 前端 history-builder 不渲染这类系统消息（history-builder.ts:503），
+      // 序号照常推进，但不参与命中。
+      if (FIND_HIDDEN_USER_MESSAGE_RE.test(content)) continue;
+      const visible = content
+        .replace(FIND_LEGACY_STEER_PREFIX_RE, "")
+        .replace(FIND_TURN_TAG_PREFIX_RE, "");
+      if (visible.trim()) entries.push({ index: currentIndex, text: visible });
+    } else {
+      const { text } = extractTextContent(m.content, { stripThink: true });
+      const content = sanitizeVisibleContent(text);
+      if (content.trim()) entries.push({ index: currentIndex, text: content });
+    }
+  }
+  return entries;
 }
 
 function nextImmediateDisplayableAssistantIndex(sourceMessages, sourceIndex, displayIdxAtSource) {
@@ -904,6 +946,69 @@ export function createSessionsRoute(engine, hub = null) {
     } catch (err) {
       if (err instanceof SessionSearchTokenizerUnavailableError) {
         log.error(`session search tokenizer unavailable: ${err.cause || err}`);
+        return c.json({ error: err.message }, 503);
+      }
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  route.get("/sessions/find", async (c) => {
+    try {
+      const requestContext = createRequestContext(c, engine);
+      const querySessionId = c.req.query("sessionId") || null;
+      let queryPath = c.req.query("path") || null;
+      if (typeof querySessionId === "string" && querySessionId.trim()) {
+        const manifest = engine.getSessionManifest?.(querySessionId.trim()) || null;
+        if (!manifest?.currentLocator?.path) {
+          return c.json({ error: "Session manifest not found", code: "session_manifest_not_found" }, 404);
+        }
+        queryPath = manifest.currentLocator.path;
+      }
+      // 定位语义要求显式目标：禁止回退 engine.currentSessionPath（全局焦点指针）。
+      if (!queryPath) return c.json({ error: t("error.missingParam", { param: "path" }) }, 400);
+      if (!isValidSessionPath(queryPath, engine.agentsDir)) {
+        return c.json({ error: "Invalid session path" }, 403);
+      }
+      const auth = authorizeSessionRoute(requestContext, "sessions.read", {
+        kind: "session",
+        studioId: requestContext.studioId,
+        sessionPath: queryPath,
+      });
+      if (!auth.allowed) return c.json({ error: "insufficient_scope", reason: auth.reason }, 403);
+
+      const query = (c.req.query("q") || "").trim();
+      if (!query) {
+        return c.json({ query, total: 0, bestIndex: null, tokens: [], matches: [], truncated: false });
+      }
+      if ([...query].length > SESSION_SEARCH_QUERY_MAX_LENGTH) {
+        return c.json({ error: "query_too_long", maxLength: SESSION_SEARCH_QUERY_MAX_LENGTH }, 400);
+      }
+
+      // 修订点必须在读取内容之前取（同 messages 路由）：读取期间若有新写入，
+      // revision 只会偏旧，下次请求会重新解析，不会把没读到的写入标成已同步。
+      const revision = await readSessionFileRevision(queryPath);
+      const cached = findEntriesCache.get(queryPath);
+      let entries;
+      if (revision && cached && cached.revision === revision) {
+        entries = cached.entries;
+      } else {
+        const sourceMessages = await loadSessionHistoryMessages(engine, queryPath);
+        const sanitize = isBridgeSessionPath(queryPath)
+          ? sanitizeBridgeVisibleText
+          : (value) => (typeof value === "string" ? value : "");
+        entries = collectFindableHistoryEntries(sourceMessages, sanitize);
+        if (revision) {
+          findEntriesCache.set(queryPath, { revision, entries });
+          if (findEntriesCache.size > FIND_ENTRIES_CACHE_MAX) {
+            findEntriesCache.delete(findEntriesCache.keys().next().value);
+          }
+        }
+      }
+      const result = findInSessionMessages(entries, query);
+      return c.json({ query, revision, ...result });
+    } catch (err) {
+      if (err instanceof SessionSearchTokenizerUnavailableError) {
+        log.error(`session find tokenizer unavailable: ${err.cause || err}`);
         return c.json({ error: err.message }, 503);
       }
       return c.json({ error: err.message }, 500);
