@@ -285,7 +285,8 @@
   },
   "chat": {
     "find": {
-      "locateFailed": "未能定位到该消息"
+      "locateFailed": "未能定位到该消息",
+      "placeholder": "在会话中查找"
     },
     "send": "发送",
     "steer": "插话",

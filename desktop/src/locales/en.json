@@ -285,7 +285,8 @@
   },
   "chat": {
     "find": {
-      "locateFailed": "Could not locate that message"
+      "locateFailed": "Could not locate that message",
+      "placeholder": "Find in conversation"
     },
     "send": "Send",
     "steer": "Steer",

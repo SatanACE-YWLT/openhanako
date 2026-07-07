@@ -2113,3 +2113,13 @@
     color: inherit;
     padding: 0;
 }
+
+/* ── 会话内查找条宿主 ──
+   ClassicFindBox 自带 position:absolute + top:14px/right:14px + z-index:12，
+   本宿主只需提供一个 position:relative 的锚点（不设 z-index，避免建立新的层叠
+   上下文——ClassicFindBox 的 z-index 需要直接与 sessionShell 等兄弟节点比较）。
+   挂载于 `.chat-area.has-panels`（ChatPage.tsx，`!welcomeVisible && currentSessionPath`
+   时为 position:relative，与本组件的渲染条件一致），故顶右偏移天然锚定到消息区域。 */
+.chatFindBarHost {
+    position: relative;
+}
