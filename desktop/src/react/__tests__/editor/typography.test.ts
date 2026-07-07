@@ -66,14 +66,14 @@ function readEditorHighlight(): string {
 describe('editor typography settings', () => {
   it('uses markdown defaults and preserves future heading controls', () => {
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.fontPreset).toBe('follow');
-    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.bodyFontSize).toBe(15);
-    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading1FontSize).toBe(24);
-    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading2FontSize).toBe(20);
+    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.bodyFontSize).toBe(16);
+    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading1FontSize).toBe(28);
+    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading2FontSize).toBe(21);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading3FontSize).toBe(18);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading4FontSize).toBe(16);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading5FontSize).toBe(15);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.heading6FontSize).toBe(14);
-    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.lineHeight).toBe(1.72);
+    expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.lineHeight).toBe(1.5);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.contentPadding).toBe(24);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.contentWidth).toBe(720);
   });
@@ -94,9 +94,9 @@ describe('editor typography settings', () => {
     expect(normalized.markdown.fontPreset).toBe('follow');
     expect(normalized.markdown.bodyFontSize).toBe(24);
     expect(normalized.markdown.heading1FontSize).toBe(16);
-    expect(normalized.markdown.heading2FontSize).toBe(20);
+    expect(normalized.markdown.heading2FontSize).toBe(21);
     expect(normalized.markdown.heading6FontSize).toBe(24);
-    expect(normalized.markdown.lineHeight).toBe(1.72);
+    expect(normalized.markdown.lineHeight).toBe(1.5);
     expect(normalized.markdown.contentPadding).toBe(0);
     expect(normalized.markdown.contentWidth).toBe(720);
     expect(DEFAULT_EDITOR_TYPOGRAPHY.markdown.contentPadding).toBe(24);
@@ -104,6 +104,22 @@ describe('editor typography settings', () => {
     const selected = normalizeEditorTypography({ markdown: { fontPreset: 'sans', contentWidth: 'unlimited' } });
     expect(selected.markdown.fontPreset).toBe('sans');
     expect(selected.markdown.contentWidth).toBe('unlimited');
+  });
+
+  it('maps the follow preset to the text-face token with display-face fallback', () => {
+    const values = new Map<string, string>();
+    const root = {
+      style: {
+        setProperty: (name: string, value: string) => values.set(name, value),
+        getPropertyValue: (name: string) => values.get(name) || '',
+      },
+    } as unknown as HTMLElement;
+
+    applyEditorTypography({ markdown: { fontPreset: 'follow' } }, root);
+
+    expect(root.style.getPropertyValue('--editor-markdown-font-family')).toBe(
+      'var(--font-serif-text, var(--font-serif))',
+    );
   });
 
   it('applies normalized typography as document-level CSS variables', () => {

@@ -45,13 +45,13 @@
     --font-serif-text: 'PT Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     --editor-markdown-font-size: 16px;
-    --editor-markdown-h1-font-size: 24px;
-    --editor-markdown-h2-font-size: 20px;
+    --editor-markdown-h1-font-size: 28px;
+    --editor-markdown-h2-font-size: 21px;
     --editor-markdown-h3-font-size: 18px;
     --editor-markdown-h4-font-size: 16px;
     --editor-markdown-h5-font-size: 15px;
     --editor-markdown-h6-font-size: 14px;
-    --editor-markdown-line-height: 1.72;
+    --editor-markdown-line-height: 1.5;
     --editor-markdown-content-padding-x: var(--space-24);
     --editor-markdown-content-width: 720px;
     --paper-texture-card-blend-mode: lighten;
