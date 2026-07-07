@@ -29,6 +29,7 @@
     --chat-message-font-size: 15px;
 
     /* 圆角 */
+    --radius-xs: 3px;
     --radius-sm: 5px;
     --radius-md: 8px;
     --radius-lg: 12px;
@@ -73,6 +74,9 @@
     /* 字体默认值：主题 CSS 可 override */
     --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     --font-serif: 'EB Garamond', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
+    /* 正文阅读衬线：markdown 预览/编辑正文专用，西文 PT Serif；
+       与 --font-serif（标题/装饰衬线，EB Garamond）区分为 text face vs display face */
+    --font-serif-text: 'PT Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
     /* 编辑器默认排版：用户设置写入同名变量，主题仍可覆盖初始值 */
@@ -164,6 +168,7 @@ html:not([data-theme="midnight"]):not([data-theme="midnight-contrast"]) body.pap
 /* 无衬线模式：覆盖 --font-serif 为当前 UI 字体 */
 body.font-sans {
     --font-serif: var(--font-ui);
+    --font-serif-text: var(--font-ui);
 }
 
 /* ========================================
