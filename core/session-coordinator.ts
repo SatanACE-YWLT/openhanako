@@ -3618,9 +3618,48 @@ export class SessionCoordinator {
     }
   }
 
+  /**
+   * Session 归属的唯一判定边界：manifest.ownerAgentId 为权威，
+   * 无 manifest（或字段缺失）时回退路径目录段推导（读时兼容旧数据），
+   * 两者皆无时返回 none。授权/门禁/归属语义一律走这里，
+   * 禁止调用点各自从路径现推。
+   * 显式契约：store 查询抛错（页损坏等）时捕获 + warn + 按路径回退，
+   * 绝不向调用方抛底层存储错误（对齐 listSessions 降级哲学）。
+   * @returns {{ agentId: string|null, source: "manifest"|"path"|"none", agentDeleted: boolean }}
+   */
+  resolveSessionOwnership(ref: any) {
+    const normalized = this._normalizeSessionRef(ref);
+    let manifest = null;
+    if (normalized.sessionId) {
+      try {
+        manifest = this._resolveSessionManifestForId(normalized.sessionId);
+      } catch (err) {
+        log.warn(`resolveSessionOwnership: manifest lookup failed for ${normalized.sessionId}: ${err?.message || err}`);
+      }
+    } else if (normalized.sessionPath) {
+      manifest = this._resolveSessionManifestForPathQuiet(normalized.sessionPath);
+    }
+    if (manifest?.ownerAgentId) {
+      return {
+        agentId: manifest.ownerAgentId,
+        source: "manifest",
+        agentDeleted: this._d.isAgentDeleted?.(manifest.ownerAgentId) === true,
+      };
+    }
+    const sessionPath = normalized.sessionPath || manifest?.currentLocator?.path || null;
+    const pathAgentId = sessionPath ? this._d.agentIdFromSessionPath?.(sessionPath) || null : null;
+    if (pathAgentId) {
+      return {
+        agentId: pathAgentId,
+        source: "path",
+        agentDeleted: this._d.isAgentDeleted?.(pathAgentId) === true,
+      };
+    }
+    return { agentId: null, source: "none", agentDeleted: false };
+  }
+
   _isDeletedAgentSessionPath(sessionPath: any) {
-    const agentId = this._d.agentIdFromSessionPath?.(sessionPath);
-    return !!agentId && this._d.isAgentDeleted?.(agentId) === true;
+    return this.resolveSessionOwnership(sessionPath).agentDeleted;
   }
 
   isRunnableSessionPath(sessionPath: any) {

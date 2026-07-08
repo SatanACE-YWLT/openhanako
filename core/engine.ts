@@ -909,6 +909,8 @@ export class HanaEngine {
   async deleteAgent(agentId) { return this._agentMgr.deleteAgent(agentId); }
   setPrimaryAgent(agentId) { return this._agentMgr.setPrimaryAgent(agentId); }
   agentIdFromSessionPath(p) { return this._agentMgr.agentIdFromSessionPath(p); }
+  resolveSessionOwnership(ref) { return this._sessionCoord.resolveSessionOwnership(ref); }
+  isDeletedAgentSession(ref) { return this._sessionCoord.resolveSessionOwnership(ref).agentDeleted; }
   async createSessionForAgent(agentId, cwd, mem, model, opts: any = {}) {
     return this._agentMgr.createSessionForAgent(agentId, cwd, mem, model, opts);
   }
