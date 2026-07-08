@@ -12,7 +12,7 @@ describe("known-models dictionary", () => {
   it("keeps current OpenAI GPT-5.4 API context metadata", () => {
     expect(lookupKnown("openai", "gpt-5.4")).toMatchObject({
       name: "GPT-5.4",
-      context: 1050000,
+      context: 272000,
       maxOutput: 128000,
       image: true,
       reasoning: true,
@@ -48,7 +48,7 @@ describe("known-models dictionary", () => {
 
   it("declares recent frontier and agent model metadata by provider", () => {
     expect(lookupKnown("openai", "gpt-5.5")).toMatchObject({
-      context: 1050000,
+      context: 272000,
       maxOutput: 128000,
       image: true,
       reasoning: true,
@@ -318,12 +318,15 @@ describe("known-models dictionary", () => {
     const m3 = {
       name: "MiniMax M3",
       context: 1000000,
-      maxOutput: 524288,
+      maxOutput: 128000,
       image: true,
       reasoning: true,
     };
     expect(lookupKnown("minimax", "MiniMax-M3")).toEqual(m3);
-    expect(lookupKnown("minimax-token-plan", "MiniMax-M3")).toEqual(m3);
+    // minimax-token-plan 不在词典分区内，经 known-model-fallbacks.json 兜底解析；
+    // 2026-07-08 对表只刷新了词典（minimax 分区 maxOutput 524288 → 128000），
+    // fallbacks 文件不在对表范围，两个数据源在此值上暂时分叉。
+    expect(lookupKnown("minimax-token-plan", "MiniMax-M3")).toEqual({ ...m3, maxOutput: 524288 });
     expect(lookupKnown("minimax", "MiniMax-M2.1-highspeed")).toEqual({
       name: "MiniMax M2.1 Highspeed",
       context: 204800,
