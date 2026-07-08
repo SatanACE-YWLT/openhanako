@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * style-discipline.mjs — 风格纪律扫描（治理③，.docs/2026-07-07-ui-discipline-audit.md）
  *
