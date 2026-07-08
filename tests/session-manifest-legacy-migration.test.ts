@@ -308,6 +308,30 @@ describe("session manifest legacy migration", () => {
     expect(store.getBySessionId(secondManifest.sessionId)?.sessionId).toBe(secondManifest.sessionId);
   });
 
+  it("rescan 回填 ownerAgentId 为空的存量 manifest（老数据读时兼容）", () => {
+    const { sessionPath } = writeSession("hana", "missing-owner.jsonl");
+    // 模拟历史缺失写入：manifest 已存在但 ownerAgentId 为 null
+    store.createForPath({ sessionPath, domain: "desktop", kind: "chat" });
+
+    const result = migrateLegacySessions({ hanaHome, store });
+
+    expect(result.existing).toBe(1);
+    expect(store.resolveByLocatorPath(sessionPath)).toMatchObject({
+      ownerAgentId: "hana",
+    });
+  });
+
+  it("rescan 不覆盖已有 ownerAgentId", () => {
+    const { sessionPath } = writeSession("hana", "owned-elsewhere.jsonl");
+    store.createForPath({ sessionPath, ownerAgentId: "bob", domain: "desktop", kind: "chat" });
+
+    migrateLegacySessions({ hanaHome, store });
+
+    expect(store.resolveByLocatorPath(sessionPath)).toMatchObject({
+      ownerAgentId: "bob",
+    });
+  });
+
   it("repairs realpath locator paths back to the app-facing legacy path during rescan", () => {
     const realSessionsDir = path.join(hanaHome, "real-sessions");
     const logicalSessionsDir = path.join(hanaHome, "agents", "hana", "sessions");

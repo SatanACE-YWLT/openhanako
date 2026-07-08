@@ -441,6 +441,10 @@ export function migrateLegacySessions(opts: any = {}) {
             importLegacyCapabilitySnapshot(opts.store, permissionRepaired || repaired, candidates);
             importLegacyExecutorMetadata(opts.store, permissionRepaired || repaired, candidates);
             backfillLegacyTitleSessionIdKey(titlesPath, titles, sessionDir, row.sessionPath, permissionRepaired || repaired);
+            const settled = permissionRepaired || repaired;
+            if (settled?.sessionId && !settled.ownerAgentId && typeof opts.store.backfillOwnerAgentId === "function") {
+              opts.store.backfillOwnerAgentId(settled.sessionId, agentId);
+            }
             result.existing += 1;
             continue;
           }
