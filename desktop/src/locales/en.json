@@ -3315,5 +3315,8 @@
     "fileSummaryMore": "- {count} more files",
     "fileSummaryHeader": "Generated files:",
     "mediaNoDisplayableFiles": "Generation result has no displayable files"
+  },
+  "sessionCollab": {
+    "messagePrefix": "[Message from agent \"{name}\", not the user]"
   }
 }
