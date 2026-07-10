@@ -58,6 +58,7 @@ function ReleaseDigestEntry({ digest }: { digest: ReleaseDigest | null | undefin
         {t('settings.about.updateDigestCta')}
       </button>
       <Overlay
+        scope="inline"
         open={open}
         onClose={() => setOpen(false)}
         className={styles.digestDialog}
