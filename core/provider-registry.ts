@@ -49,6 +49,7 @@ const INVALID_MODELS_CONFIG = "invalid_models_config";
 const DELETED_PROVIDERS_KEY = "_deleted_providers";
 const PROVIDER_RUNTIME_META_KEYS = new Set(["_config_error"]);
 const THINKING_LEVEL_VALUES = new Set(["auto", "off", "low", "medium", "high", "xhigh", "max"]);
+const CHAT_CREDENTIAL_SOURCES = new Set(["provider-catalog", "auth-storage", "none"]);
 const MEDIA_USER_CONFIG_KEYS = {
   imageGeneration: "image_generation",
   videoGeneration: "video_generation",
@@ -152,11 +153,18 @@ function mediaUserConfigKey(capability) {
   return MEDIA_USER_CONFIG_KEYS[key] || capability;
 }
 
-function defaultChatCapability(providerId) {
+function defaultCredentialSource(authType) {
+  if (authType === "oauth") return "auth-storage";
+  if (authType === "none") return "none";
+  return "provider-catalog";
+}
+
+function defaultChatCapability(providerId, authType = "api-key") {
   return {
     runtimeProviderId: providerId,
     displayProviderId: providerId,
     projection: "models-json",
+    credentialSource: defaultCredentialSource(authType),
     allowListSource: "provider.models",
   };
 }
@@ -237,10 +245,14 @@ function normalizeMediaCapability(capability, entry, capabilityName) {
 
 function normalizeCapabilities(plugin, entry) {
   const raw = plugin?.capabilities || {};
+  const chatDefaults = defaultChatCapability(entry.id, entry.authType);
   const capabilities = {
     ...raw,
-    chat: raw.chat ? { ...defaultChatCapability(entry.id), ...raw.chat } : defaultChatCapability(entry.id),
+    chat: raw.chat ? { ...chatDefaults, ...raw.chat } : chatDefaults,
   };
+  if (!CHAT_CREDENTIAL_SOURCES.has(capabilities.chat?.credentialSource)) {
+    throw new Error(`Invalid chat credentialSource "${capabilities.chat?.credentialSource}" for provider "${entry.id}"`);
+  }
   const rawMedia = raw.media || {};
   const media: any = {};
   for (const [rawKey, rawCapability] of Object.entries(rawMedia)) {
@@ -743,12 +755,14 @@ export class ProviderRegistry {
   resolveChatProvider(providerId) {
     const entry = this.get(providerId);
     if (!entry) return null;
-    const chat = entry.capabilities?.chat || defaultChatCapability(entry.id);
+    const chat = entry.capabilities?.chat || defaultChatCapability(entry.id, entry.authType);
     return {
       originalProviderId: providerId,
+      sourceProviderId: entry.id,
       providerId: chat.runtimeProviderId || entry.id,
       displayProviderId: chat.displayProviderId || chat.runtimeProviderId || entry.id,
       projection: chat.projection || "models-json",
+      credentialSource: chat.credentialSource || defaultCredentialSource(entry.authType),
       allowListSource: chat.allowListSource || "provider.models",
       entry,
     };
@@ -758,12 +772,145 @@ export class ProviderRegistry {
     return this.resolveChatProvider(providerId)?.projection || "models-json";
   }
 
+  getChatModelSelection(providerId) {
+    const resolved = this.resolveChatProvider(providerId);
+    if (!resolved) return null;
+    const canonicalProviderId = resolved.sourceProviderId;
+    const raw = this.getAllProvidersRaw();
+    const explicitConfig = Object.prototype.hasOwnProperty.call(raw, canonicalProviderId)
+      ? raw[canonicalProviderId]
+      : raw[providerId];
+    const configError = isPlainObject(explicitConfig) && typeof explicitConfig._config_error === "string"
+      ? explicitConfig._config_error
+      : null;
+    const hasExplicitModels = isPlainObject(explicitConfig)
+      && Object.prototype.hasOwnProperty.call(explicitConfig, "models");
+    const selectedModels = configError
+      ? []
+      : hasExplicitModels
+      ? explicitConfig.models
+      : this.getDefaultModels(canonicalProviderId);
+    const models = Array.isArray(selectedModels)
+      ? cloneData(selectedModels).filter((model) => getModelType(canonicalProviderId, model) === "chat")
+      : [];
+    return {
+      sourceProviderId: canonicalProviderId,
+      explicitConfig: cloneData(explicitConfig || {}),
+      configError,
+      hasExplicitModels,
+      selectionMode: configError
+        ? "invalid"
+        : (!hasExplicitModels ? "default" : (models.length === 0 ? "disabled" : "allowlist")),
+      models,
+    };
+  }
+
+  getChatModelEntries(providerId) {
+    return this.getChatModelSelection(providerId)?.models || [];
+  }
+
+  /**
+   * 设置页“发现模型”使用的可重新选择目录。它与运行时 allowlist 分离：
+   * 即使用户明确写了 models: []，仍返回 provider 默认模型；用户显式模型
+   * 与默认同 ID 时，用户对象元数据覆盖默认条目。
+   */
+  getChatDiscoverableModelEntries(providerId) {
+    const resolved = this.resolveChatProvider(providerId);
+    if (!resolved) return [];
+    const sourceProviderId = resolved.sourceProviderId;
+    const selection = this.getChatModelSelection(sourceProviderId);
+    const explicitModels = selection?.hasExplicitModels
+      ? selection.explicitConfig?.models
+      : [];
+    return mergeProviderModelEntries(
+      this.getDefaultModels(sourceProviderId),
+      explicitModels,
+    ).filter((model) => getModelType(sourceProviderId, model) === "chat");
+  }
+
   getChatModelIds(providerId) {
-    const models = this.getAllProvidersRaw()[providerId]?.models || [];
-    return models
+    return this.getChatModelEntries(providerId)
       .filter((model) => getModelType(providerId, model) === "chat")
       .map(getModelId)
       .filter(Boolean);
+  }
+
+  /**
+   * 返回 chat provider 的生效配置。models 的三态语义在这里集中解析：
+   * 缺少字段 → Hana/plugin 默认；[] → 明确关闭；非空 → 用户 allowlist。
+   */
+  getEffectiveChatProviderConfig(providerId) {
+    const resolved = this.resolveChatProvider(providerId);
+    if (!resolved) return null;
+    const selection = this.getChatModelSelection(providerId);
+    const explicitConfig = selection?.explicitConfig || {};
+    const entry = resolved.entry;
+    return {
+      ...cloneData(explicitConfig || {}),
+      base_url: explicitConfig?.base_url || entry.baseUrl || "",
+      api: explicitConfig?.api || entry.api || "openai-completions",
+      headers: explicitConfig?.headers || entry.headers || {},
+      auth_type: explicitConfig?.auth_type || entry.authType || "api-key",
+      models: selection?.models || [],
+    };
+  }
+
+  /**
+   * 将 Hana provider 身份解析为唯一的运行时投影计划。
+   * 多个配置源指向同一 runtime provider 时显式报错，禁止静默覆盖。
+   */
+  getChatProjectionPlans() {
+    if (this._entries.size === 0) this.reload();
+    const raw = this.getAllProvidersRaw();
+    const candidates = new Set(Object.keys(raw));
+    for (const [providerId, plugin] of this._plugins) {
+      if (Array.isArray(plugin?.models) || plugin?.capabilities?.chat?.projection === "sdk-auth-alias") {
+        candidates.add(providerId);
+      }
+    }
+
+    const sourceOwners = new Map();
+    for (const candidate of candidates) {
+      const resolved = this.resolveChatProvider(candidate);
+      if (!resolved) continue;
+      const owner = resolved.sourceProviderId;
+      const previous = sourceOwners.get(owner);
+      if (previous && previous !== candidate) {
+        throw new Error(`Chat provider config collision: "${previous}" and "${candidate}" both resolve to "${owner}"`);
+      }
+      sourceOwners.set(owner, candidate);
+    }
+
+    const plans = [];
+    const runtimeOwners = new Map();
+    for (const [sourceProviderId, configuredAs] of sourceOwners) {
+      const resolved = this.resolveChatProvider(sourceProviderId);
+      if (!resolved) continue;
+      const runtimeProviderId = resolved.providerId;
+      const previous = runtimeOwners.get(runtimeProviderId);
+      if (previous && previous !== sourceProviderId) {
+        throw new Error(`Chat runtime provider collision: "${previous}" and "${sourceProviderId}" both project to "${runtimeProviderId}"`);
+      }
+      runtimeOwners.set(runtimeProviderId, sourceProviderId);
+      const selection = this.getChatModelSelection(configuredAs);
+      plans.push({
+        sourceProviderId,
+        configuredAs,
+        runtimeProviderId,
+        displayProviderId: resolved.displayProviderId,
+        projection: resolved.projection,
+        credentialSource: resolved.credentialSource,
+        allowListSource: resolved.allowListSource,
+        hasExplicitModels: selection?.hasExplicitModels === true,
+        selectionMode: selection?.selectionMode === "invalid"
+          ? "invalid"
+          : resolved.projection === "sdk-auth-alias" && selection?.hasExplicitModels !== true
+          ? "runtime-catalog"
+          : (selection?.selectionMode || "disabled"),
+        config: this.getEffectiveChatProviderConfig(configuredAs),
+      });
+    }
+    return plans;
   }
 
   getMediaModels(providerId, capability) {
@@ -1128,6 +1275,19 @@ export class ProviderRegistry {
     return entry?.id || providerId;
   }
 
+  _providerConfigForModelMutation(providerId) {
+    const ownerProviderId = this.resolveChatProvider(providerId)?.sourceProviderId || providerId;
+    const rawProvider = this.getAllProvidersRaw()[ownerProviderId] || {};
+    const models = Object.prototype.hasOwnProperty.call(rawProvider, "models")
+      ? rawProvider.models
+      : this.getChatModelEntries(ownerProviderId);
+    return {
+      ownerProviderId,
+      rawProvider,
+      models: Array.isArray(models) ? models : [],
+    };
+  }
+
   getModelDefaultThinkingLevel(providerId, modelId) {
     if (!providerId || !modelId) return null;
     const userConfig = this._loadAddedModels();
@@ -1172,8 +1332,7 @@ export class ProviderRegistry {
    * @param {string | { id: string, name?: string, context?: number, maxOutput?: number }} model
    */
   addModel(providerId, model) {
-    const rawProvider = this.getAllProvidersRaw()[providerId] || {};
-    const models = Array.isArray(rawProvider.models) ? rawProvider.models : [];
+    const { ownerProviderId, rawProvider, models } = this._providerConfigForModelMutation(providerId);
 
     const newId = typeof model === "object" ? model.id : model;
     const exists = models.some(
@@ -1182,8 +1341,8 @@ export class ProviderRegistry {
     if (exists) return;
 
     const nextModels = [...models, model];
-    validateProviderModels(providerId, nextModels, { baseUrl: rawProvider.base_url });
-    this.saveProvider(providerId, { models: nextModels });
+    validateProviderModels(ownerProviderId, nextModels, { baseUrl: rawProvider.base_url });
+    this.saveProvider(ownerProviderId, { models: nextModels });
   }
 
   /**
@@ -1192,13 +1351,11 @@ export class ProviderRegistry {
    * @param {string} modelId
    */
   removeModel(providerId, modelId) {
-    const uc = this.getAllProvidersRaw()[providerId];
-    if (!uc?.models || !Array.isArray(uc.models)) return;
-
-    const models = uc.models.filter(
+    const { ownerProviderId, models: currentModels } = this._providerConfigForModelMutation(providerId);
+    const models = currentModels.filter(
       (m) => (typeof m === "object" ? m.id : m) !== modelId,
     );
-    this.saveProvider(providerId, { models });
+    this.saveProvider(ownerProviderId, { models });
   }
 
   /**
@@ -1206,11 +1363,10 @@ export class ProviderRegistry {
    * 裸字符串条目会被升级为对象
    * @param {string} providerId
    * @param {string} modelId
-   * @param {{ name?: string, context?: number, contextWindow?: number, maxOutput?: number, maxTokens?: number, maxOutputTokens?: number, image?: boolean, video?: boolean, audio?: boolean, reasoning?: boolean, xhigh?: boolean, thinkingLevels?: string[], defaultThinkingLevel?: string, compat?: object, toolUse?: object, visionCapabilities?: object }} meta
+   * @param {{ name?: string, api?: string, context?: number, contextWindow?: number, maxOutput?: number, maxTokens?: number, maxOutputTokens?: number, image?: boolean, video?: boolean, audio?: boolean, reasoning?: boolean, xhigh?: boolean, thinkingLevels?: string[], thinkingLevelMap?: object, defaultThinkingLevel?: string, compat?: object, toolUse?: object, visionCapabilities?: object }} meta
    */
   updateModelEntry(providerId, modelId, meta) {
-    const rawProvider = this.getAllProvidersRaw()[providerId] || {};
-    const models = Array.isArray(rawProvider.models) ? rawProvider.models : [];
+    const { ownerProviderId, rawProvider, models } = this._providerConfigForModelMutation(providerId);
 
     // 兼容前端仍可能发来 vision 字段（过渡期）：转写为 image
     if (meta && typeof meta === "object" && meta.vision !== undefined && meta.image === undefined) {
@@ -1227,7 +1383,7 @@ export class ProviderRegistry {
     }
 
     // 白名单：只允许模型能力字段（image 是标准名，vision 为旧名不写入）
-    const ALLOWED = ["name", "context", "maxOutput", "image", "video", "audio", "reasoning", "xhigh", "thinkingLevels", "type", "defaultThinkingLevel"];
+    const ALLOWED = ["name", "api", "context", "maxOutput", "image", "video", "audio", "reasoning", "xhigh", "thinkingLevels", "thinkingLevelMap", "type", "defaultThinkingLevel"];
     const safe: any = {};
     for (const key of ALLOWED) {
       if (meta[key] !== undefined) safe[key] = meta[key];
@@ -1261,8 +1417,8 @@ export class ProviderRegistry {
       nextModels.push({ id: modelId, ...safe });
     }
 
-    validateProviderModels(providerId, nextModels, { baseUrl: rawProvider.base_url });
-    this.saveProvider(providerId, { models: nextModels });
+    validateProviderModels(ownerProviderId, nextModels, { baseUrl: rawProvider.base_url });
+    this.saveProvider(ownerProviderId, { models: nextModels });
   }
 
   _ensureMediaConfig(userConfig, providerId, capability) {

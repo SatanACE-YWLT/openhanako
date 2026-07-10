@@ -32,6 +32,22 @@ describe("session thinking level capabilities", () => {
     expect(normalizePiSdkThinkingLevel("auto")).toBe("medium");
   });
 
+  it("clamps unsupported legacy OAuth off levels to each GPT-5.6 model default", () => {
+    const sol = {
+      id: "gpt-5.6-sol",
+      provider: "openai-codex",
+      thinkingLevels: ["low", "medium", "high", "max"],
+      thinkingLevelMap: { off: null, minimal: null, xhigh: "max" },
+      defaultThinkingLevel: "low",
+    };
+    const terra = { ...sol, id: "gpt-5.6-terra", defaultThinkingLevel: "medium" };
+
+    expect(normalizeThinkingLevelForModel("off", sol)).toBe("low");
+    expect(normalizeThinkingLevelForModel("off", terra)).toBe("medium");
+    expect(normalizeThinkingLevelForModel("max", sol)).toBe("max");
+    expect(modelSupportsXhigh(sol)).toBe(true);
+  });
+
   it("shows the unified Max level for GPT-5.5", () => {
     const model = { id: "gpt-5.5", provider: "openai", reasoning: true };
 

@@ -601,7 +601,7 @@ hub.eventBus.handle("utility:call-text", async (payload: any = {}) => {
   const agentId = typeof payload.agentId === "string" && payload.agentId.trim()
     ? payload.agentId.trim()
     : (sessionPath ? engine.resolveSessionOwnership?.(sessionPath)?.agentId || null : null);
-  const utility = engine.resolveUtilityConfig({ agentId, sessionPath });
+  const utility = await engine.resolveUtilityConfigFresh({ agentId, sessionPath });
   const text = await callText({
     api: utility.api,
     apiKey: utility.api_key,
@@ -639,7 +639,7 @@ hub.eventBus.handle("model:sample-text", async (payload: any = {}) => {
   const pluginId = typeof payload.pluginId === "string" && payload.pluginId.trim()
     ? payload.pluginId.trim()
     : null;
-  const utility = engine.resolveUtilityConfig({ agentId, sessionPath });
+  const utility = await engine.resolveUtilityConfigFresh({ agentId, sessionPath });
   const text = await callText({
     api: utility.api,
     apiKey: utility.api_key,

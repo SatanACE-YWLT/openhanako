@@ -69,8 +69,10 @@ const moduleLog = createModuleLogger("agent");
 
 type AgentAppearanceEngine = {
   resolveVisionConfig?: () => ResolvedAgentAppearanceModelConfig | null;
+  resolveVisionConfigFresh?: () => Promise<ResolvedAgentAppearanceModelConfig | null>;
   currentModel?: AgentAppearanceModel | null;
   resolveModelWithCredentials?: (modelRef: unknown) => ResolvedAgentAppearanceModelConfig | null;
+  resolveModelWithCredentialsFresh?: (modelRef: unknown) => Promise<ResolvedAgentAppearanceModelConfig | null>;
   usageLedger?: unknown;
 };
 
@@ -122,6 +124,7 @@ export class Agent {
   declare _pinnedMemoryTools: any;
   declare _repairState: any;
   declare _resolveModel: any;
+  declare _resolveModelFresh: any;
   declare _runtimeInitialized: any;
   declare _searchConfigResolver: any;
   declare _sessionFoldersTool: any;
@@ -277,7 +280,12 @@ export class Agent {
     this._refreshRepairState();
   }
 
-  async init(log: (msg?: string) => void = () => {}, sharedModels: any = {}, resolveModel = null) {
+  async init(
+    log: (msg?: string) => void = () => {},
+    sharedModels: any = {},
+    resolveModel = null,
+    resolveModelFresh = null,
+  ) {
     if (this._runtimeInitialized) return;
 
     // 0. 兼容性检查（目录、数据库、配置文件）
@@ -362,6 +370,7 @@ export class Agent {
     // 保存解析函数：每次 tick 现场调用，拿到最新凭证。
     // 不缓存解析结果——provider key/url/api 变更后 tick 自动恢复，无需重启 agent。
     this._resolveModel = resolveModel || null;
+    this._resolveModelFresh = resolveModelFresh || null;
 
     // 启动时试探性 resolve 一次，只为打一条启动告警（运行时由 ticker 各调用点的 try/catch 处理）
     if (this._memoryModel && this._resolveModel) {
@@ -384,11 +393,16 @@ export class Agent {
         configPath: this.configPath,
         factStore: this._factStore,
         // 现场 resolve：每次 tick 拿到 yaml 最新凭证
-        getResolvedMemoryModel: () => ({
-          ...this._resolveModel(this._memoryModel, this._config),
-          usageLedger: this._cb?.getEngine?.()?.usageLedger,
-          usageAgentId: this.id,
-        }),
+        getResolvedMemoryModel: async () => {
+          if (!this._resolveModelFresh) {
+            throw new Error("fresh memory model resolver is unavailable");
+          }
+          return {
+            ...await this._resolveModelFresh(this._memoryModel, this._config),
+            usageLedger: this._cb?.getEngine?.()?.usageLedger,
+            usageAgentId: this.id,
+          };
+        },
         getMemoryMasterEnabled: () => this._memoryMasterEnabled,
         isSessionMemoryEnabled: (sessionPath) => this.isSessionMemoryEnabledFor(sessionPath),
         getTimezone: () => this._cb?.getTimezone?.() || Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -579,7 +593,7 @@ export class Agent {
         cfg.capabilities = { ...cfg.capabilities, learn_skills: globalLearn };
         return cfg;
       },
-      resolveUtilityConfig: (options) => this._cb?.resolveUtilityConfig?.(options),
+      resolveUtilityConfig: (options) => this._cb?.resolveUtilityConfigFresh?.(options),
       onInstalled: async (skillName) => {
         await this._onInstallCallback?.(skillName);
       },
@@ -783,12 +797,13 @@ export class Agent {
 
   async refreshAppearanceSummary(options: RefreshAppearanceSummaryOptions = {}) {
     const engine = this._getAppearanceEngine();
+    const freshVisionConfig = await engine?.resolveVisionConfigFresh?.() || null;
     const summary = await refreshAgentAppearanceProfileResource({
       agentDir: this.agentDir,
       agentName: this.agentName,
-      visionConfig: this._resolveAppearanceVisionConfig(engine),
+      visionConfig: freshVisionConfig,
       targetModel: options.targetModel || null,
-      resolveModelWithCredentials: (modelRef) => engine?.resolveModelWithCredentials?.(modelRef) || null,
+      resolveModelWithCredentialsFresh: (modelRef) => engine?.resolveModelWithCredentialsFresh?.(modelRef) || Promise.resolve(null),
       callText: (callOptions) => callText(callOptions as unknown as Parameters<typeof callText>[0]),
       usageLedger: engine?.usageLedger,
       signal: options.signal,

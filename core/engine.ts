@@ -303,12 +303,12 @@ export class HanaEngine {
     this._approvalGateway = createApprovalGateway({
       smallToolModelReviewer: createModelApprovalReviewer({
         role: "utility",
-        resolveUtilityConfig: (options) => this.resolveUtilityConfig(options || {}),
+        resolveUtilityConfig: (options) => this.resolveUtilityConfigFresh(options || {}),
         callText: (options) => this._callApprovalReviewerText(options),
       }),
       largeToolModelReviewer: createModelApprovalReviewer({
         role: "utility_large",
-        resolveUtilityConfig: (options) => this.resolveUtilityConfig(options || {}),
+        resolveUtilityConfig: (options) => this.resolveUtilityConfigFresh(options || {}),
         callText: (options) => this._callApprovalReviewerText(options),
       }),
     });
@@ -363,6 +363,7 @@ export class HanaEngine {
       getSkills: () => this._skills,
       getSearchConfig: () => this.getSearchConfig(),
       resolveUtilityConfig: (options) => this.resolveUtilityConfig(options),
+      resolveUtilityConfigFresh: (options) => this.resolveUtilityConfigFresh(options),
       getSharedModels: () => this._configCoord.getSharedModels(),
       getChannelManager: () => this._channels,
       getSessionCoordinator: () => this._sessionCoord,
@@ -429,7 +430,7 @@ export class HanaEngine {
     });
 
     this._visionBridge = new VisionBridge({
-      resolveVisionConfig: () => this.resolveVisionConfig(),
+      resolveVisionConfig: () => this.resolveVisionConfigFresh(),
       getUsageLedger: () => this._usageLedger,
       getActiveAgentId: () => this._agentMgr.activeAgentId,
       getSessionIdForPath: (sessionPath) => this.getSessionIdForPath(sessionPath),
@@ -1343,17 +1344,35 @@ export class HanaEngine {
     if (!ref) return null;
     return this.resolveModelWithCredentials(ref);
   }
+  async resolveVisionConfigFresh() {
+    if (!this.isVisionAuxiliaryEnabled()) return null;
+    const ref = this.getSharedModels()?.vision || null;
+    if (!ref) return null;
+    return this.resolveModelWithCredentialsFresh(ref);
+  }
   getSearchConfig() { return this._configCoord.getSearchConfig(); }
   setSearchConfig(p) { return this._configCoord.setSearchConfig(p); }
   getUtilityApi() { return this._configCoord.getUtilityApi(); }
   setUtilityApi(p) { return this._configCoord.setUtilityApi(p); }
   resolveUtilityConfig( options: any = {}) {
+    const resolvedOptions = this._resolveUtilityOptions(options);
+    const config = this._configCoord.resolveUtilityConfig(resolvedOptions);
+    return this._withUtilityUsageAttribution(config, resolvedOptions);
+  }
+  async resolveUtilityConfigFresh( options: any = {}) {
+    const resolvedOptions = this._resolveUtilityOptions(options);
+    const config = await this._configCoord.resolveUtilityConfigFresh(resolvedOptions);
+    return this._withUtilityUsageAttribution(config, resolvedOptions);
+  }
+  _resolveUtilityOptions( options: any = {}) {
     const resolvedOptions = { ...(options || {}) };
     if (!resolvedOptions.agentId && resolvedOptions.sessionPath) {
       const ownerAgentId = this.resolveSessionOwnership(resolvedOptions.sessionPath).agentId;
       if (ownerAgentId) resolvedOptions.agentId = ownerAgentId;
     }
-    const config = this._configCoord.resolveUtilityConfig(resolvedOptions);
+    return resolvedOptions;
+  }
+  _withUtilityUsageAttribution(config, resolvedOptions) {
     let usageSessionId = resolvedOptions.sessionId || null;
     if (!usageSessionId && resolvedOptions.sessionPath) {
       try {
@@ -1736,6 +1755,7 @@ export class HanaEngine {
   resolveProviderCredentials(p) { return this._resolveProviderCredentials(p); }
   resolveProviderCredentialsFresh(p) { return this._models.resolveProviderCredentialsFresh(p); }
   resolveModelWithCredentials(ref) { return this._models.resolveModelWithCredentials(ref); }
+  resolveModelWithCredentialsFresh(ref) { return this._models.resolveModelWithCredentialsFresh(ref); }
   async refreshAvailableModels() { return this._models.refreshAvailable(); }
   /**
    * Provider 配置变更后的统一操作序列。
@@ -2511,7 +2531,7 @@ export class HanaEngine {
     }
     const { writeDiary } = await import("../lib/diary/diary-writer.ts");
     const diaryModelId = this.agent.config.models?.chat || this.agent.memoryModel;
-    const resolvedModel = this._models.resolveModelWithCredentials(diaryModelId);
+    const resolvedModel = await this._models.resolveModelWithCredentialsFresh(diaryModelId);
     // 写日记是用户主动触发的「读历史」功能，必须参考记忆，
     // 跟「在对话中潜移默化带入记忆」的 master 开关无关。所以不查 memoryMasterEnabled。
     // per-session 开关只决定缺摘要时是否写回 summaries；关闭时仍可为本次日记临时压缩。
@@ -2555,7 +2575,7 @@ export class HanaEngine {
   }
 
   async summarizeTitle(ut, at, opts: any = {}) {
-    return _summarizeTitle(this.resolveUtilityConfig(this._utilityOptionsForContext(opts)), ut, at, opts);
+    return _summarizeTitle(await this.resolveUtilityConfigFresh(this._utilityOptionsForContext(opts)), ut, at, opts);
   }
 
   async translateSkillNames(names, lang, opts: any = {}) {
@@ -2567,8 +2587,8 @@ export class HanaEngine {
       skills,
       names,
       lang,
-      translateMissing: (missingNames) => _translateSkillNames(
-        this.resolveUtilityConfig(opts.agentId ? { agentId: opts.agentId } : undefined),
+      translateMissing: async (missingNames) => _translateSkillNames(
+        await this.resolveUtilityConfigFresh(opts.agentId ? { agentId: opts.agentId } : undefined),
         missingNames,
         lang,
       ),
@@ -2577,7 +2597,7 @@ export class HanaEngine {
 
   async summarizeActivity(sp, preloaded, opts: any = {}) {
     const utilityOptions = this._utilityOptionsForContext({ ...opts, sessionPath: opts.sessionPath || sp });
-    return _summarizeActivity(this.resolveUtilityConfig(utilityOptions), sp, (msg) => this.emitDevLog(msg), preloaded);
+    return _summarizeActivity(await this.resolveUtilityConfigFresh(utilityOptions), sp, (msg) => this.emitDevLog(msg), preloaded);
   }
 
   async summarizeActivityQuick(activityId) {
@@ -2589,7 +2609,7 @@ export class HanaEngine {
     }
     if (!entry?.sessionFile) return null;
     const sessionPath = path.join(this.agentsDir, foundAgentId, "activity", entry.sessionFile);
-    return _summarizeActivityQuick(this.resolveUtilityConfig({ agentId: foundAgentId }), sessionPath);
+    return _summarizeActivityQuick(await this.resolveUtilityConfigFresh({ agentId: foundAgentId }), sessionPath);
   }
 
   // ════════════════════════════

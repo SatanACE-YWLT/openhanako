@@ -124,6 +124,7 @@ export class AgentManager {
    * @param {() => import('./skill-manager.ts').SkillManager} deps.getSkills
    * @param {() => object} deps.getSearchConfig
    * @param {() => object} deps.resolveUtilityConfig
+   * @param {() => Promise<object>} deps.resolveUtilityConfigFresh
    * @param {() => object} deps.getSharedModels
    * @param {() => import('./channel-manager.ts').ChannelManager} deps.getChannelManager
    * @param {() => import('./session-coordinator.ts').SessionCoordinator} deps.getSessionCoordinator
@@ -330,7 +331,9 @@ export class AgentManager {
     const sharedModels = this._d.getSharedModels?.() || {};
     const resolveModel = (bareId) =>
       this._d.getModels().resolveModelWithCredentials(bareId);
-    await ag.init(task.log, sharedModels, resolveModel);
+    const resolveModelFresh = (bareId) =>
+      this._d.getModels().resolveModelWithCredentialsFresh(bareId);
+    await ag.init(task.log, sharedModels, resolveModel, resolveModelFresh);
     this._d.getSkills()?.syncAgentSkills?.(ag);
     this._d.getHub()?.scheduler?.startAgentHeartbeat?.(task.agentId, ag);
     return ag;
@@ -526,7 +529,7 @@ export class AgentManager {
         if (match?.[1] === hash) return; // 没变化，跳过
       } catch {} // 文件不存在，继续生成
 
-      const utilConfig = this._d.resolveUtilityConfig({ agentId });
+      const utilConfig = await this._d.resolveUtilityConfigFresh({ agentId });
       const locale = ag.config?.locale || "zh";
       const desc = await generateDescription(utilConfig, source, locale);
       if (!desc) {
@@ -708,8 +711,10 @@ export class AgentManager {
     ag.setGetOwnerIds(this._makeOwnerIdsFn(ag));
     const resolveModel = (bareId) =>
       this._d.getModels().resolveModelWithCredentials(bareId);
+    const resolveModelFresh = (bareId) =>
+      this._d.getModels().resolveModelWithCredentialsFresh(bareId);
     try {
-      await ag.init(() => {}, this._d.getSharedModels(), resolveModel);
+      await ag.init(() => {}, this._d.getSharedModels(), resolveModel, resolveModelFresh);
     } catch (err) {
       // init 失败：回滚已创建的目录和频道状态，防止孤儿残留
       await this._rollbackAgentCreation(agentDir, agentId);
@@ -1097,6 +1102,7 @@ export class AgentManager {
       listActiveAgents:     () => this.listActiveAgentsForRoster(),
       createChannelEntry:    (input) => getEngine()?.createChannelEntry?.(input),
       resolveUtilityConfig: (options) => getEngine()?.resolveUtilityConfig?.({ ...(options || {}), agentId: ag.id }),
+      resolveUtilityConfigFresh: (options) => getEngine()?.resolveUtilityConfigFresh?.({ ...(options || {}), agentId: ag.id }),
       getCwd:               () => getEngine()?.cwd ?? "",
       getTimezone:          () => getEngine()?.getTimezone?.() ?? "",
       scheduleMemoryMaintenance: (agentId, reason) =>
@@ -1154,7 +1160,7 @@ export class AgentManager {
   async _generateAgentId(name) {
     let utilConfig;
     try {
-      utilConfig = this._d.resolveUtilityConfig();
+      utilConfig = await this._d.resolveUtilityConfigFresh();
     } catch {
       // utility 模型未配置（新用户常见），直接走兜底 ID
       return `agent-${Date.now().toString(36)}`;

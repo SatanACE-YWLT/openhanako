@@ -708,12 +708,21 @@ export class Hub {
     // ── provider & agent handlers ──
 
     this._sessionHandlerCleanups.push(bus.handle("provider:credentials", async ({ providerId }) => {
-      const fresh = typeof engine.resolveProviderCredentialsFresh === "function"
-        ? await engine.resolveProviderCredentialsFresh(providerId)
-        : null;
-      const creds = fresh
-        ? { apiKey: fresh.api_key, baseUrl: fresh.base_url, api: fresh.api, accountId: fresh.accountId }
-        : engine.providerRegistry.getCredentials(providerId);
+      if (typeof engine.resolveProviderCredentialsFresh !== "function") {
+        return { error: "fresh_credentials_unavailable" };
+      }
+      let fresh;
+      try {
+        fresh = await engine.resolveProviderCredentialsFresh(providerId);
+      } catch {
+        return { error: "credential_refresh_failed" };
+      }
+      const creds = {
+        apiKey: fresh?.api_key,
+        baseUrl: fresh?.base_url,
+        api: fresh?.api,
+        accountId: fresh?.accountId,
+      };
       if (!creds?.apiKey) return { error: "no_credentials" };
       return {
         apiKey: creds.apiKey,

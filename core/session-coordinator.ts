@@ -1367,8 +1367,23 @@ export class SessionCoordinator {
         || await this._readSessionPromptSnapshot(agent, sessionPathForMeta)
       )
       : null;
+    let restoredSessionModelRef = null;
+    if (restore) {
+      try {
+        restoredSessionModelRef = sessionMgr?.buildSessionContext?.()?.model || null;
+      } catch (err) {
+        log.warn(`restore model ref read failed: ${err.message}`);
+      }
+      if (restoredSessionModelRef?.provider && restoredSessionModelRef?.modelId
+        && !findModel(models.availableModels, restoredSessionModelRef.modelId, restoredSessionModelRef.provider)) {
+        throw new Error(t("error.modelNotFound", {
+          id: `${restoredSessionModelRef.provider}/${restoredSessionModelRef.modelId}`,
+        }));
+      }
+    }
     const restoredPromptModel = restore && !restoredPromptSnapshot
-      ? this._resolvePromptModelFromSessionManager(sessionMgr, models)
+      && restoredSessionModelRef?.provider && restoredSessionModelRef?.modelId
+      ? findModel(models.availableModels, restoredSessionModelRef.modelId, restoredSessionModelRef.provider)
       : null;
     const promptPatchModel = restoredPromptSnapshot ? null : (effectiveModel || restoredPromptModel);
     const requestedThinkingLevel = normalizeSessionThinkingLevel(
@@ -1632,9 +1647,37 @@ export class SessionCoordinator {
     if (effectiveModel) sessionOpts.model = effectiveModel;
     const { session, modelFallbackMessage } = await createAgentSession(sessionOpts);
     if (modelFallbackMessage) {
+      if (restore) {
+        await teardownSessionResources({
+          session,
+          unsub: null,
+          label: "restore-model-fallback-rejected",
+          warn: (message) => log.warn(message),
+        });
+        throw new Error(`Session restore model fallback rejected: ${modelFallbackMessage}`);
+      }
       log.warn(`session model fallback: ${modelFallbackMessage}`);
     }
-    const resolvedModel = session.model;
+    const runtimeResolvedModel = session.model;
+    const catalogResolvedModel = runtimeResolvedModel?.id && runtimeResolvedModel?.provider
+      ? findModel(models.availableModels, runtimeResolvedModel.id, runtimeResolvedModel.provider)
+      : null;
+    const runtimeResolvedModelHasIdentity = !!(
+      runtimeResolvedModel?.id && runtimeResolvedModel?.provider
+    );
+    if (restore && runtimeResolvedModelHasIdentity && !catalogResolvedModel) {
+      await teardownSessionResources({
+        session,
+        unsub: null,
+        label: "restore-model-rejected",
+        warn: (message) => log.warn(message),
+      });
+      const ref = runtimeResolvedModel?.provider && runtimeResolvedModel?.id
+        ? `${runtimeResolvedModel.provider}/${runtimeResolvedModel.id}`
+        : "unknown";
+      throw new Error(t("error.modelNotFound", { id: ref }));
+    }
+    const resolvedModel = catalogResolvedModel || runtimeResolvedModel;
     const actualThinkingLevel = normalizeThinkingLevelForModel(requestedThinkingLevel, resolvedModel);
     if (actualThinkingLevel !== initialThinkingLevel) {
       initialThinkingLevel = actualThinkingLevel;
@@ -2690,6 +2733,44 @@ export class SessionCoordinator {
     }
   }
 
+  /**
+   * Enforce Hana's current model allowlist at the last reusable-session boundary.
+   * Pi sessions retain their model object across turns; a provider refresh can
+   * therefore leave a disabled model usable unless every new turn revalidates
+   * the session-owned `{provider,id}` identity here.
+   *
+   * When the identity is still allowed, bind the freshly rebuilt Hana model
+   * object so api/context/thinking metadata cannot remain stale.
+   */
+  _assertSessionModelAvailable(session: any) {
+    const currentModel = session?.model;
+    const modelId = typeof currentModel?.id === "string" ? currentModel.id : "";
+    const provider = typeof currentModel?.provider === "string" ? currentModel.provider : "";
+    const models = this._d.getModels?.();
+    const allowedModel = modelId && provider && Array.isArray(models?.availableModels)
+      ? findModel(models.availableModels, modelId, provider)
+      : null;
+    const modelRef = provider && modelId ? `${provider}/${modelId}` : "unknown";
+
+    if (!allowedModel) {
+      const error: any = new Error(t("error.modelNotFound", { id: modelRef }));
+      error.code = "MODEL_NOT_AVAILABLE";
+      error.modelRef = modelRef;
+      throw error;
+    }
+
+    if (currentModel !== allowedModel) {
+      const rebound = refreshSessionModelFromRegistry(session, allowedModel);
+      if (rebound !== true || session.model !== allowedModel) {
+        const error: any = new Error(`Failed to rebind active session model: ${modelRef}`);
+        error.code = "MODEL_REBIND_FAILED";
+        error.modelRef = modelRef;
+        throw error;
+      }
+    }
+    return allowedModel;
+  }
+
   async prompt(text: any, opts: any) {
     const turnContext = normalizeSessionTurnContext(opts?.context);
     if (!this._session) {
@@ -2697,6 +2778,7 @@ export class SessionCoordinator {
       if (!currentPath) throw new Error(t("error.noActiveSessionPrompt"));
       this._session = await this.ensureSessionLoaded(currentPath);
     }
+    this._assertSessionModelAvailable(this._session);
     this._sessionStarted = true;
     const sp = this._session.sessionManager?.getSessionFile?.();
     if (sp) {
@@ -2785,6 +2867,7 @@ export class SessionCoordinator {
     if (sessionPath === this.currentSessionPath && this._session !== entry.session) {
       this._session = entry.session;
     }
+    this._assertSessionModelAvailable(entry.session);
     await this._reloadDirtyExtensionRunnerIfPossible(entry, sessionPath, "prompt_session");
     entry.lastTouchedAt = Date.now();
     if (entry.sessionVisibility !== "plugin_private" && entry.sessionVisibility !== "private") {
@@ -2864,6 +2947,7 @@ export class SessionCoordinator {
 
     entry.lastTouchedAt = Date.now();
     if (entry.session.isStreaming) {
+      this._assertSessionModelAvailable(entry.session);
       await entry.session.sendCustomMessage(message, { deliverAs: "followUp" });
       this._emitTurnInputPresentation(sessionPath, message, "followUp");
       return { ok: true, mode: "followUp" };
@@ -2871,6 +2955,7 @@ export class SessionCoordinator {
 
     const triggerTurn = options?.triggerTurn !== false;
     if (triggerTurn) {
+      this._assertSessionModelAvailable(entry.session);
       this._emitTurnInputPresentation(sessionPath, message, "triggerTurn");
     }
     await entry.session.sendCustomMessage(message, { triggerTurn });
@@ -3741,7 +3826,7 @@ export class SessionCoordinator {
     for (const [sessionKey, entry] of this._sessions) {
       const sessionPath = this._sessionPathForEntry(entry, sessionKey);
       try {
-        refreshSessionModelFromRegistry(entry.session);
+        this._assertSessionModelAvailable(entry.session);
         this._renewCachePrefixContract(sessionPath, entry, "provider_refresh");
       } catch (err) {
         log.warn(`refreshAllSessionsModels: ${err.message}`);
@@ -4526,17 +4611,6 @@ export class SessionCoordinator {
       const meta = await this._readMetaCached(metaPath);
       return normalizeSessionPromptSnapshot(meta[path.basename(sessionPath)]?.promptSnapshot);
     } catch {
-      return null;
-    }
-  }
-
-  _resolvePromptModelFromSessionManager(sessionMgr: any, models: any) {
-    try {
-      const ref = sessionMgr?.buildSessionContext?.()?.model;
-      if (!ref?.provider || !ref?.modelId) return null;
-      return findModel(models.availableModels, ref.modelId, ref.provider);
-    } catch (err) {
-      log.warn(`restore prompt patch model resolve failed: ${err.message}`);
       return null;
     }
   }

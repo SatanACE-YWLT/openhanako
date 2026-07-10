@@ -172,7 +172,7 @@ export function createModelRegistry(authStorage, modelsJsonPath) {
 }
 
 /**
- * 强制 session 从 ModelRegistry 重新解析当前 model 对象。
+ * 强制 session 重新绑定当前 model 对象。
  *
  * 为什么需要：Pi SDK 的 model 对象把 baseUrl 烤在字段里
  * （openai-completions.js 等 provider 直接读 model.baseUrl 构造 client），
@@ -184,8 +184,26 @@ export function createModelRegistry(authStorage, modelsJsonPath) {
  * registerProvider/unregisterProvider 时被调用，没有公开包装。
  * 这里走 adapter 纪律统一桥接，下次 SDK 升级改名只改这里。
  *
+ * 当 Hana 已经从自己的 allowlist 解析出 `allowedModel` 时，直接绑定该
+ * ModelRegistry 刷新后对象；这避免 Pi 的私有刷新方法在 Hana 已禁用模型时
+ * 找到并保留 Pi 内置目录中的同名模型。未传第二参数时保留旧 adapter 行为。
+ *
  * @param {object} session - AgentSession 实例
+ * @param {object} [allowedModel] - Hana 当前 allowlist 中、与 session 同身份的模型对象
+ * @returns {boolean} 是否完成了刷新/重绑
  */
-export function refreshSessionModelFromRegistry(session) {
+export function refreshSessionModelFromRegistry(session, allowedModel) {
+  if (allowedModel !== undefined) {
+    const currentModel = session?.model;
+    if (!currentModel || !allowedModel
+      || currentModel.id !== allowedModel.id
+      || currentModel.provider !== allowedModel.provider
+      || !session?.agent?.state) {
+      return false;
+    }
+    session.agent.state.model = allowedModel;
+    return true;
+  }
   session?._refreshCurrentModelFromRegistry?.();
+  return true;
 }

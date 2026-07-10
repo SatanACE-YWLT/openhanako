@@ -3,11 +3,12 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 
-const { createAgentSessionMock, sessionManagerCreateMock, sessionManagerListMock, emitSessionShutdownMock, moduleLogMock } = vi.hoisted(() => ({
+const { createAgentSessionMock, sessionManagerCreateMock, sessionManagerListMock, emitSessionShutdownMock, refreshSessionModelFromRegistryMock, moduleLogMock } = vi.hoisted(() => ({
   createAgentSessionMock: vi.fn(),
   sessionManagerCreateMock: vi.fn(),
   sessionManagerListMock: vi.fn(),
   emitSessionShutdownMock: vi.fn(),
+  refreshSessionModelFromRegistryMock: vi.fn(),
   moduleLogMock: {
     log: vi.fn(),
     warn: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock("../lib/pi-sdk/index.js", () => ({
   },
   resizeModelImageInput: vi.fn(async (image) => image),
   formatModelImageDimensionNote: vi.fn(() => undefined),
+  refreshSessionModelFromRegistry: refreshSessionModelFromRegistryMock,
 }));
 
 vi.mock("../lib/debug-log.js", () => ({
@@ -49,6 +51,13 @@ describe("SessionCoordinator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    refreshSessionModelFromRegistryMock.mockImplementation((session, allowedModel) => {
+      if (allowedModel !== undefined) {
+        if (session?.agent?.state) session.agent.state.model = allowedModel;
+        if (session && Object.prototype.hasOwnProperty.call(session, "model")) session.model = allowedModel;
+      }
+      return true;
+    });
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-session-coordinator-"));
     sessionManagerCreateMock.mockReturnValue({ getCwd: () => "/tmp/workspace" });
     sessionManagerListMock.mockResolvedValue([]);
@@ -334,6 +343,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: model,
+        availableModels: [model],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -1253,6 +1263,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: textOnlyModel,
+        availableModels: [textOnlyModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -1599,6 +1610,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: model,
+        availableModels: [model],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -1800,6 +1812,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: model,
+        availableModels: [model],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -2601,6 +2614,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: textOnlyModel,
+        availableModels: [textOnlyModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -2668,6 +2682,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: textOnlyModel,
+        availableModels: [textOnlyModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -2736,6 +2751,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: kimiCodingModel,
+        availableModels: [kimiCodingModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -2798,6 +2814,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: textOnlyModel,
+        availableModels: [textOnlyModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",
@@ -2868,6 +2885,7 @@ describe("SessionCoordinator", () => {
       getActiveAgentId: () => "hana",
       getModels: () => ({
         currentModel: mimoAudioModel,
+        availableModels: [mimoAudioModel],
         authStorage: {},
         modelRegistry: {},
         resolveThinkingLevel: () => "medium",

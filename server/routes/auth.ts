@@ -292,6 +292,8 @@ export function createAuthRoute(engine) {
     }
     const authKey = engine.providerRegistry?.getAuthJsonKey(provider) || provider;
     engine.authStorage.logout(authKey);
+    engine.providerRegistry?.clearAuthCache?.();
+    await engine.onProviderChanged?.();
     return c.json({ ok: true });
   });
 
@@ -300,8 +302,11 @@ export function createAuthRoute(engine) {
   /** 获取某个 OAuth provider 的自定义模型列表 */
   route.get("/auth/oauth/:provider/custom-models", async (c) => {
     const provider = c.req.param("provider");
-    const custom = engine.preferences.getOAuthCustomModels();
-    return c.json({ models: custom[provider] || [] });
+    const resolved = engine.providerRegistry.resolveChatProvider?.(provider);
+    if (!resolved || resolved.entry?.authType !== "oauth") {
+      return c.json({ error: `OAuth provider "${provider}" not found` }, 404);
+    }
+    return c.json({ models: engine.providerRegistry.getChatModelIds(resolved.sourceProviderId) });
   });
 
   /** 添加自定义模型到 OAuth provider */
@@ -313,24 +318,26 @@ export function createAuthRoute(engine) {
       return c.json({ error: "modelId is required" }, 400);
     }
     const id = modelId.trim();
-    const custom = engine.preferences.getOAuthCustomModels();
-    const list = custom[provider] || [];
-    if (list.includes(id)) return c.json({ ok: true, models: list });
-    list.push(id);
-    engine.preferences.setOAuthCustomModels(provider, list);
-    await engine.refreshModels();
-    return c.json({ ok: true, models: list });
+    const resolved = engine.providerRegistry.resolveChatProvider?.(provider);
+    if (!resolved || resolved.entry?.authType !== "oauth") {
+      return c.json({ error: `OAuth provider "${provider}" not found` }, 404);
+    }
+    engine.providerRegistry.addModel(resolved.sourceProviderId, id);
+    await engine.onProviderChanged();
+    return c.json({ ok: true, models: engine.providerRegistry.getChatModelIds(resolved.sourceProviderId) });
   });
 
   /** 删除 OAuth provider 的某个自定义模型 */
   route.delete("/auth/oauth/:provider/custom-models/:modelId", async (c) => {
     const provider = c.req.param("provider");
     const modelId = c.req.param("modelId");
-    const custom = engine.preferences.getOAuthCustomModels();
-    const list = (custom[provider] || []).filter(id => id !== modelId);
-    engine.preferences.setOAuthCustomModels(provider, list);
-    await engine.refreshModels();
-    return c.json({ ok: true, models: list });
+    const resolved = engine.providerRegistry.resolveChatProvider?.(provider);
+    if (!resolved || resolved.entry?.authType !== "oauth") {
+      return c.json({ error: `OAuth provider "${provider}" not found` }, 404);
+    }
+    engine.providerRegistry.removeModel(resolved.sourceProviderId, modelId);
+    await engine.onProviderChanged();
+    return c.json({ ok: true, models: engine.providerRegistry.getChatModelIds(resolved.sourceProviderId) });
   });
 
   return route;

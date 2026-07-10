@@ -7,6 +7,14 @@ function makeEngine(loginImpl: any) {
   return {
     providerRegistry: {
       getAuthJsonKey: vi.fn((provider: string) => provider === "openai-codex-oauth" ? "openai-codex" : provider),
+      clearAuthCache: vi.fn(),
+      resolveChatProvider: vi.fn(() => ({
+        sourceProviderId: "openai-codex-oauth",
+        entry: { authType: "oauth" },
+      })),
+      getChatModelIds: vi.fn(() => ["gpt-5.6-sol", "my-codex-model"]),
+      addModel: vi.fn(),
+      removeModel: vi.fn(),
     },
     authStorage: {
       getOAuthProviders: vi.fn(() => [
@@ -87,5 +95,39 @@ describe("auth oauth route", () => {
 
     expect(await second.json()).toEqual(await first.json());
     expect(engine.authStorage.login).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes Hana model availability after OAuth logout", async () => {
+    const engine = makeEngine(() => new Promise(() => {}));
+    const app = new Hono();
+    app.route("/api", createAuthRoute(engine));
+
+    const response = await app.request("/api/auth/oauth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "openai-codex-oauth" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(engine.authStorage.logout).toHaveBeenCalledWith("openai-codex");
+    expect(engine.providerRegistry.clearAuthCache).toHaveBeenCalled();
+    expect(engine.onProviderChanged).toHaveBeenCalled();
+  });
+
+  it("delegates the legacy OAuth custom-model route to Provider Catalog", async () => {
+    const engine = makeEngine(() => new Promise(() => {}));
+    const app = new Hono();
+    app.route("/api", createAuthRoute(engine));
+
+    const response = await app.request("/api/auth/oauth/openai-codex/custom-models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ modelId: "my-codex-model" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(engine.providerRegistry.addModel).toHaveBeenCalledWith("openai-codex-oauth", "my-codex-model");
+    expect(engine.onProviderChanged).toHaveBeenCalled();
+    expect(engine.preferences.setOAuthCustomModels).not.toHaveBeenCalled();
   });
 });
