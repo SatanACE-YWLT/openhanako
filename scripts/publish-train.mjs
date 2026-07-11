@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * scripts/publish-train.mjs — publishes one channel's hot-update train.
  *
