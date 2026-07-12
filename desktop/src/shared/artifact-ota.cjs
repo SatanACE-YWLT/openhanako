@@ -369,18 +369,31 @@ function parseVersionTriplet(version) {
 }
 
 /**
+ * Three-way semantic comparison of two `major.minor.patch` version strings:
+ * -1 when a < b, 0 when equal, 1 when a > b. Each segment is compared as a
+ * NUMBER, never as text — "0.100.0" is newer than "0.99.0" even though a
+ * plain string comparison says the opposite. Returns null when either side
+ * doesn't parse as a version triplet; every caller decides what "can't
+ * compare" means for its own gate instead of this function guessing.
+ */
+function compareVersions(a, b) {
+  const left = parseVersionTriplet(a);
+  const right = parseVersionTriplet(b);
+  if (!left || !right) return null;
+  for (let i = 0; i < 3; i += 1) {
+    if (left[i] !== right[i]) return left[i] > right[i] ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
  * Conservative by construction: an unparseable version on EITHER side
  * blocks the update (returns false) rather than guessing — we never want
  * to silently proceed past a check we can't actually evaluate.
  */
 function isShellVersionSufficient(currentShellVersion, minShellVersion) {
-  const current = parseVersionTriplet(currentShellVersion);
-  const min = parseVersionTriplet(minShellVersion);
-  if (!current || !min) return false;
-  for (let i = 0; i < 3; i += 1) {
-    if (current[i] !== min[i]) return current[i] > min[i];
-  }
-  return true;
+  const cmp = compareVersions(currentShellVersion, minShellVersion);
+  return cmp !== null && cmp >= 0;
 }
 
 // ── preload contract comparison (additive-only integer version, not semver) ─
@@ -604,6 +617,44 @@ function isVersionAlreadyCurrent({ currentServerPointer, currentRendererPointer,
   );
 }
 
+/**
+ * Version DIRECTION rule: content version never goes backward. A shelf
+ * manifest carrying a LOWER version than what's already activated is a
+ * downgrade, not an update, no matter how new its train number is — and a
+ * downgrade is structurally unsafe here for two reasons: a version
+ * directory is named after the version number itself (so "activating an
+ * older version" collides with the same-name-can't-apply rule above), and
+ * data migrations only ever run forward, so older code reading data
+ * structures written by newer code has unpredictable consequences. When
+ * this fires, the correct answer is "you're already up to date": the
+ * downgrade is never surfaced as available and never allowed to apply.
+ * True as soon as EITHER kind's manifest version is strictly below its
+ * pointer's version — both kinds always ship together, so one kind moving
+ * backward is enough to refuse the whole train.
+ *
+ * This also pins down the recall playbook: pulling the shelf pointer back
+ * to an older release only protects users who haven't updated yet; users
+ * who already took the bad release must be rescued by re-publishing the
+ * good content under a HIGHER version number, never by shipping an older
+ * version as if it were new.
+ *
+ * Read-time compatibility: a pointer that's missing, or was written before
+ * the `version` field existed, disables this check (returns false) and
+ * behavior falls back to the existing train/content/version gates. An
+ * unparseable version string on either side likewise never counts as
+ * "behind" rather than guessing a direction.
+ * @returns {boolean}
+ */
+function isVersionBehindCurrent({ currentServerPointer, currentRendererPointer, serverEntry, rendererEntry }) {
+  const hasVersion = (pointer) => Boolean(
+    pointer && typeof pointer.version === "string" && pointer.version.length > 0,
+  );
+  if (!hasVersion(currentServerPointer) || !hasVersion(currentRendererPointer)) return false;
+  const serverCmp = compareVersions(serverEntry.version, currentServerPointer.version);
+  const rendererCmp = compareVersions(rendererEntry.version, currentRendererPointer.version);
+  return (serverCmp !== null && serverCmp < 0) || (rendererCmp !== null && rendererCmp < 0);
+}
+
 function buildAvailableDescriptor({ manifest, serverEntry, rendererEntry, version }) {
   return {
     train: manifest.train,
@@ -625,8 +676,10 @@ function buildAvailableDescriptor({ manifest, serverEntry, rendererEntry, versio
  * ota-state.json, and reflected in the returned `outcome`.
  *
  * Outcomes: "not-modified" (304 — state otherwise untouched), "up-to-date"
- * (train not newer, content byte-identical to `current`, or version
- * already identical to `current` even with different bytes), "available"
+ * (train not newer, content byte-identical to `current`, version already
+ * identical to `current` even with different bytes, or shelf version
+ * OLDER than what's activated — a downgrade is never an update),
+ * "available"
  * (a real update exists and passed every gate; nothing downloaded yet),
  * "minshell-blocked" (a real update exists but this shell is too old to
  * receive it), "rollout-excluded", "quarantined", "error".
@@ -694,16 +747,29 @@ async function checkOnce(opts) {
 
     const { serverEntry, rendererEntry, version } = deriveArtifactEntries(manifest, platformArch);
 
-    // Content reconciliation short-circuit — see `isContentAlreadyCurrent`'s
-    // and `isVersionAlreadyCurrent`'s doc comments.
+    // Content reconciliation short-circuit — see `isContentAlreadyCurrent`'s,
+    // `isVersionAlreadyCurrent`'s and `isVersionBehindCurrent`'s doc
+    // comments. The three predicates are mutually exclusive by construction
+    // (each is only evaluated when the previous ones didn't fire), so the
+    // per-case logs below never overlap.
     const contentAlreadyCurrent = isContentAlreadyCurrent({ currentServerPointer, currentRendererPointer, serverEntry, rendererEntry });
     const versionAlreadyCurrent = !contentAlreadyCurrent
       && isVersionAlreadyCurrent({ currentServerPointer, currentRendererPointer, serverEntry, rendererEntry });
-    if (contentAlreadyCurrent || versionAlreadyCurrent) {
+    const versionBehindCurrent = !contentAlreadyCurrent && !versionAlreadyCurrent
+      && isVersionBehindCurrent({ currentServerPointer, currentRendererPointer, serverEntry, rendererEntry });
+    if (contentAlreadyCurrent || versionAlreadyCurrent || versionBehindCurrent) {
       if (versionAlreadyCurrent) {
         log(
           `[ota] train ${manifest.train} (${version}) matches the currently activated version but has different bytes; `
             + "treating as already up-to-date (this usually means the installer seed and the shelf box came from different builds)",
+        );
+      }
+      if (versionBehindCurrent) {
+        log(
+          `[ota] train ${manifest.train} (${version}) is OLDER than the currently activated version `
+            + `(server ${currentServerPointer.version}, renderer ${currentRendererPointer.version}); `
+            + "shelf content behind this install is not an update — treating as already up-to-date "
+            + "(a rollback must be re-published under a higher version number to reach installs like this one)",
         );
       }
       await writeOtaChannelState(homeDir, channel, {
@@ -941,6 +1007,16 @@ async function downloadAndApplyArtifacts(opts) {
       throw new Error(
         `train ${manifest.train} (${version}) matches the currently activated version ${currentPointer.version}; `
           + "content with the same version can never be applied, even though its bytes differ",
+      );
+    }
+
+    // Version direction gate (see `isVersionBehindCurrent`'s doc comment):
+    // content version never goes backward. Also checked before acquiring
+    // the lock so a downgrade train never triggers a doomed download.
+    if (isVersionBehindCurrent({ currentServerPointer: currentPointer, currentRendererPointer, serverEntry, rendererEntry })) {
+      throw new Error(
+        `train ${manifest.train} (${version}) is older than the currently activated version ${currentPointer.version}; `
+          + "content version is never allowed to go backward — a rollback must be re-published under a higher version number",
       );
     }
 

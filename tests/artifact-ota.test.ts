@@ -541,6 +541,130 @@ describe("artifact-ota: checkOnce (gates, never downloads)", () => {
     expect(result.version).toBe("0.390.0");
   });
 
+  it("reports up-to-date when the manifest's version is OLDER than the currently activated version, even on a newer train (a downgrade is never surfaced as an update)", async () => {
+    const root = makeTempDir("hana-ota-e2e-");
+    const keys = makeKeys();
+    const { manifestPath } = await makeOtaFixture(root, keys, { train: 3, version: "0.389.0" });
+    const homeDir = path.join(root, "home");
+    // The install is at a HIGHER content version than the shelf (dev build,
+    // or a fresh installer released ahead of its train). The shelf's train
+    // number is newer, but applying it would move the content backward —
+    // data migrations only run forward, so this must read as "already up
+    // to date", never as "a new version is available".
+    await pointerStore.writePointer(homeDir, SEED_CHANNEL, "current", {
+      train: 0,
+      kind: "server",
+      version: "0.446.20",
+      sha256: "a".repeat(64),
+    });
+    const rendererChannel = artifactBoot.rendererPointerChannel(SEED_CHANNEL);
+    await pointerStore.writePointer(homeDir, rendererChannel, "current", {
+      train: 0,
+      kind: "renderer",
+      version: "0.446.20",
+      sha256: "b".repeat(64),
+    });
+
+    const result = await runWithDevOverride(manifestPath, () =>
+      checkOnce({ homeDir, keyset: keys.keyset, currentShellVersion: SHELL_VERSION, platformArch: PLATFORM_ARCH, log: () => {} }),
+    );
+
+    expect(result.outcome).toBe("up-to-date");
+    const state = (await readOtaState(homeDir))[SEED_CHANNEL];
+    expect(state.available).toBeNull();
+    expect(state.lastError).toBeNull();
+    expect(fs.existsSync(stagingDirFor(homeDir))).toBe(false);
+  });
+
+  it("still reports 'available' when the manifest's version is higher than the current pointers' version (the downgrade gate must not fire on a real upgrade)", async () => {
+    const root = makeTempDir("hana-ota-e2e-");
+    const keys = makeKeys();
+    const { manifestPath } = await makeOtaFixture(root, keys, { train: 3, version: "0.101.0" });
+    const homeDir = path.join(root, "home");
+    await pointerStore.writePointer(homeDir, SEED_CHANNEL, "current", {
+      train: 0,
+      kind: "server",
+      version: "0.100.0",
+      sha256: "a".repeat(64),
+    });
+    const rendererChannel = artifactBoot.rendererPointerChannel(SEED_CHANNEL);
+    await pointerStore.writePointer(homeDir, rendererChannel, "current", {
+      train: 0,
+      kind: "renderer",
+      version: "0.100.0",
+      sha256: "b".repeat(64),
+    });
+
+    const result = await runWithDevOverride(manifestPath, () =>
+      checkOnce({ homeDir, keyset: keys.keyset, currentShellVersion: SHELL_VERSION, platformArch: PLATFORM_ARCH, log: () => {} }),
+    );
+
+    expect(result.outcome).toBe("available");
+    expect(result.version).toBe("0.101.0");
+  });
+
+  it("reports up-to-date when only ONE kind's pointer is ahead of the manifest version (a half-behind train is conservatively not an update)", async () => {
+    const root = makeTempDir("hana-ota-e2e-");
+    const keys = makeKeys();
+    const { manifestPath } = await makeOtaFixture(root, keys, { train: 3, version: "0.400.0" });
+    const homeDir = path.join(root, "home");
+    // Server pointer is AHEAD of the manifest (0.446.20 > 0.400.0), the
+    // renderer pointer is behind it (0.389.0 < 0.400.0). Applying this
+    // train would downgrade the server kind — one kind moving backward is
+    // enough to refuse the whole train (both kinds always ship together).
+    await pointerStore.writePointer(homeDir, SEED_CHANNEL, "current", {
+      train: 0,
+      kind: "server",
+      version: "0.446.20",
+      sha256: "a".repeat(64),
+    });
+    const rendererChannel = artifactBoot.rendererPointerChannel(SEED_CHANNEL);
+    await pointerStore.writePointer(homeDir, rendererChannel, "current", {
+      train: 0,
+      kind: "renderer",
+      version: "0.389.0",
+      sha256: "b".repeat(64),
+    });
+
+    const result = await runWithDevOverride(manifestPath, () =>
+      checkOnce({ homeDir, keyset: keys.keyset, currentShellVersion: SHELL_VERSION, platformArch: PLATFORM_ARCH, log: () => {} }),
+    );
+
+    expect(result.outcome).toBe("up-to-date");
+    const state = (await readOtaState(homeDir))[SEED_CHANNEL];
+    expect(state.available).toBeNull();
+  });
+
+  it("compares versions numerically per segment, not as strings (0.99.0 is BEHIND 0.100.0 even though '0.99.0' > '0.100.0' lexicographically)", async () => {
+    const root = makeTempDir("hana-ota-e2e-");
+    const keys = makeKeys();
+    const { manifestPath } = await makeOtaFixture(root, keys, { train: 3, version: "0.99.0" });
+    const homeDir = path.join(root, "home");
+    await pointerStore.writePointer(homeDir, SEED_CHANNEL, "current", {
+      train: 0,
+      kind: "server",
+      version: "0.100.0",
+      sha256: "a".repeat(64),
+    });
+    const rendererChannel = artifactBoot.rendererPointerChannel(SEED_CHANNEL);
+    await pointerStore.writePointer(homeDir, rendererChannel, "current", {
+      train: 0,
+      kind: "renderer",
+      version: "0.100.0",
+      sha256: "b".repeat(64),
+    });
+
+    const result = await runWithDevOverride(manifestPath, () =>
+      checkOnce({ homeDir, keyset: keys.keyset, currentShellVersion: SHELL_VERSION, platformArch: PLATFORM_ARCH, log: () => {} }),
+    );
+
+    // A lexicographic comparison would call 0.99.0 "newer" than 0.100.0 and
+    // surface the downgrade as an update; numeric comparison must not.
+    expect(result.outcome).toBe("up-to-date");
+    const state = (await readOtaState(homeDir))[SEED_CHANNEL];
+    expect(state.available).toBeNull();
+  });
+
   it("skips (does not record available) when the shell is below minShell, but still records the available descriptor with minShellBlocked", async () => {
     const root = makeTempDir("hana-ota-e2e-");
     const keys = makeKeys();
@@ -899,6 +1023,41 @@ describe("artifact-ota: downloadAndApplyArtifacts", () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/0\.389\.0/);
+    expect(await pointerStore.readPointer(homeDir, SEED_CHANNEL, "next")).toBeNull();
+    expect(await pointerStore.readPointer(homeDir, rendererChannel, "next")).toBeNull();
+    // Never even reaches staging: the archives are never downloaded when
+    // this gate rejects before `acquireLock`.
+    expect(fs.existsSync(stagingDirFor(homeDir))).toBe(false);
+  });
+
+  it("fails without downloading any artifact archives when the manifest's version is OLDER than the currently activated version (content version never goes backward)", async () => {
+    const root = makeTempDir("hana-ota-e2e-");
+    const keys = makeKeys();
+    const { manifestPath } = await makeOtaFixture(root, keys, { train: 3, version: "0.389.0" });
+    const homeDir = path.join(root, "home");
+    await pointerStore.writePointer(homeDir, SEED_CHANNEL, "current", {
+      train: 0,
+      kind: "server",
+      version: "0.446.20",
+      sha256: "a".repeat(64),
+    });
+    const rendererChannel = artifactBoot.rendererPointerChannel(SEED_CHANNEL);
+    await pointerStore.writePointer(homeDir, rendererChannel, "current", {
+      train: 0,
+      kind: "renderer",
+      version: "0.446.20",
+      sha256: "b".repeat(64),
+    });
+
+    const result = await runWithDevOverride(manifestPath, () =>
+      downloadAndApplyArtifacts({ homeDir, keyset: keys.keyset, currentShellVersion: SHELL_VERSION, platformArch: PLATFORM_ARCH, log: () => {} }),
+    );
+
+    expect(result.ok).toBe(false);
+    // Message must be attributable: both the shelf's version and this
+    // install's activated version, so a support screenshot is self-explanatory.
+    expect(result.error).toContain("0.389.0");
+    expect(result.error).toContain("0.446.20");
     expect(await pointerStore.readPointer(homeDir, SEED_CHANNEL, "next")).toBeNull();
     expect(await pointerStore.readPointer(homeDir, rendererChannel, "next")).toBeNull();
     // Never even reaches staging: the archives are never downloaded when
